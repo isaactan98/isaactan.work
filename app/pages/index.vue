@@ -77,9 +77,9 @@ const work: Work[] = [
     name: 'Shadow Anime',
     note: 'Streaming front end over a public anime API',
     tech: 'Nuxt 3 · TypeScript · 6★',
-    // TODO(isaac): work.vue says this is deployed on Vercel but the URL is not
-    // recorded anywhere. Paste it here and set dest to 'Live' — a running demo
-    // outranks a repository link every time.
+    // Deliberately points at the repository, not a demo: the deployed instance
+    // depends on a third-party API that no longer serves it. A dead demo is
+    // worse than no demo, and the code is still the thing worth reading.
     dest: 'GitHub',
     href: 'https://github.com/isaactan98/shadow-anime'
   }

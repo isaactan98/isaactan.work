@@ -160,7 +160,68 @@ were, with the Notion cover flush to the top of the viewport.
 - `nuxt.config.ts` sets `tailwindcss.cssPath` explicitly: the module resolves
   its default path against `rootDir`, which misses Nuxt 4's `app/` srcDir.
 
+## Deployment
+
+Images are built by GitHub Actions and published to GitHub Container Registry;
+the home server only ever pulls. Nothing is compiled on the box, and a build
+that fails never reaches it.
+
+```
+push to master ──▶ .github/workflows/docker.yml ──▶ ghcr.io/isaactan98/isaactan.work:latest
+                                                              │
+                                          docker compose pull │ on the server
+                                                              ▼
+                                                   compose.yml ──▶ :3000 (loopback)
+                                                              ▼
+                                                     cloudflared ──▶ isaactan.work
+```
+
+### Building
+
+`Dockerfile` is two stages. The build stage is pinned to `$BUILDPLATFORM` so
+`npm ci` and `nuxt build` always run natively on the amd64 runner rather than
+under emulation; only the runtime stage varies per architecture. This works
+because `better-sqlite3` ships prebuilt binaries for linux x64 and arm64, glibc
+and musl alike, so the Nitro bundle produced on one architecture runs on all of
+them. Images are published for `linux/amd64` and `linux/arm64`.
+
+The runtime stage installs nothing — `nuxt build` emits a self-contained server
+under `.output`, its dependencies included.
+
+### On the server
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+The package is private by default, so the box authenticates once with a classic
+PAT carrying `read:packages`:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u isaactan98 --password-stdin
+```
+
+Making the package public in the repository's Package settings removes that step.
+
+Port 3000 is bound to loopback, not `0.0.0.0`: the only thing that should reach
+it is `cloudflared` on the same host. Nothing is exposed to the LAN and no port
+is forwarded on the router — which is exactly what the diagram on the landing
+page claims, so it needs to stay true. If `cloudflared` runs as a container
+instead, swap the `ports` block for the shared network commented out in
+`compose.yml`.
+
+### Two things worth knowing
+
+- `server/api/health.ts` backs the container healthcheck. It deliberately does
+  not touch the content database: a health check that fails for reasons
+  unrelated to liveness causes restart loops rather than preventing them.
+- The container is **not** `read_only`. Nuxt Content v3 builds its query
+  database on the first request, writing `.output/server/contents.sqlite`. That
+  file is derived entirely from baked-in content and is rebuilt on every start,
+  so there is nothing to persist — but the filesystem has to be writable and the
+  `node` user has to own `.output`.
+
 ## Not in this phase
 
-Deployment, Docker, CI/CD, Cloudflare Tunnel, Nuxt Studio, and static
-generation are all out of scope for now.
+Nuxt Studio and static generation (`nuxt generate`) are out of scope for now —
+the site is served by the Nitro node server, not as static files.
