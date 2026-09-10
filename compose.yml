@@ -1,0 +1,64 @@
+# Deployment descriptor for the home server. Nothing is built here — this pulls
+# the image GitHub Actions already published and runs it.
+#
+#   docker compose pull && docker compose up -d
+#
+# The image is private by default, so the box needs to authenticate once:
+#   echo $GHCR_TOKEN | docker login ghcr.io -u isaactan98 --password-stdin
+# using a classic PAT with `read:packages`. Making the package public in the
+# repository's Package settings removes that step entirely.
+
+services:
+  site:
+    image: ghcr.io/isaactan98/isaactan.work:latest
+    container_name: isaactan-work
+    restart: unless-stopped
+
+    # Bound to loopback on purpose: the only thing that should reach this port
+    # is cloudflared on the same host. Nothing is exposed to the LAN, and the
+    # router keeps no forwarded port — which is what the diagram on the site
+    # claims, so it had better stay true.
+    #
+    # If cloudflared runs as a container instead, drop this block, uncomment
+    # the network below, and point the tunnel at http://site:3000.
+    ports:
+      - '127.0.0.1:3000:3000'
+
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: '3000'
+
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+    # No volume and nothing to back up: the markdown is baked into the image at
+    # build time, so a rollback is just an older tag.
+    #
+    # Not `read_only: true`, though it looks like it should be. Nuxt Content v3
+    # builds its query database on the first request, writing
+    # .output/server/contents.sqlite inside the container. A read-only root
+    # filesystem makes that write fail and the site 500s on the first hit.
+    # The file is derived entirely from baked-in content and is rebuilt on every
+    # container start, so losing it on restart costs nothing.
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+#    networks:
+#      - tunnel
+#
+# networks:
+#   tunnel:
+#     external: true

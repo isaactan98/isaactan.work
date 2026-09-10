@@ -14,6 +14,7 @@
 const nav = [
   { label: 'Experience', to: '/#experience', page: false },
   { label: 'Work', to: '/work', page: true },
+  { label: 'Freelance', to: '/freelance', page: true },
   { label: 'Contact', to: '/#contact', page: false }
 ]
 </script>

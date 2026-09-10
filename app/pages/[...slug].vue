@@ -17,9 +17,10 @@ if (!page.value) {
 // is passed in markdown.
 provide('contentPage', page)
 
-useSeoMeta({
-  title: () => page.value?.title,
-  description: () => page.value?.description
+usePageSeo({
+  title: page.value?.title ?? 'Isaac Tan',
+  description: page.value?.description ?? '',
+  path: route.path
 })
 </script>
 

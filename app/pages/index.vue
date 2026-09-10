@@ -3,10 +3,11 @@
 // it must win the route match against `[...slug].vue`.
 definePageMeta({ layout: 'site' })
 
-useSeoMeta({
+usePageSeo({
   title: 'Isaac Tan — Full-stack engineer',
   description:
-    'Full-stack engineer in Singapore, commuting from Johor Bahru. Enterprise systems by day; a self-hosted home server by night.'
+    'Full-stack engineer in Singapore, commuting from Johor Bahru. Enterprise systems by day; a self-hosted home server by night.',
+  path: '/'
 })
 
 type Row = {
@@ -41,27 +42,50 @@ const stack: { label: string; items: string }[] = [
 ]
 
 // Star counts are from the GitHub API on 2026-09-10.
-const repoCount = 17
+const repoCount = 14
 
-const work: { name: string; note: string; tech: string; href?: string }[] = [
+/**
+ * Selected work sits above the CV on purpose: a reader asking "can this person
+ * build" gets the artifacts before the employment history, which — with the
+ * employer unnamed — is the half of the page that can actually be checked.
+ *
+ * Every row must resolve somewhere. `dest` names what the reader lands on so
+ * the click is never a surprise; a row with no destination does not belong on
+ * this page.
+ */
+type Work = { name: string; note: string; tech: string; dest: string; href: string }
+
+const work: Work[] = [
   {
     name: 'Expense Tracker',
-    note: 'SGD/MYR, offline-first PWA, on my own server',
-    tech: 'demo on request'
+    note: 'Dual-currency SGD/MYR PWA, offline-first, self-hosted',
+    tech: 'Nuxt · Express · SQLite',
+    // Self-hosted, so there is no public URL to give yet. The case study is a
+    // real destination in the meantime — problem, build, stack and outcome.
+    // TODO(deploy): swap for the tunnel URL once the box is exposed.
+    dest: 'Case study',
+    href: '/work#expense'
   },
   {
     name: 'Nuxt Video Chat',
     note: 'Peer-to-peer video from ICE and SDP up — no video SDK',
     tech: 'Socket.io · WebRTC · 7★',
+    dest: 'GitHub',
     href: 'https://github.com/isaactan98/nuxt_video_chat_app'
   },
   {
     name: 'Shadow Anime',
     note: 'Streaming front end over a public anime API',
     tech: 'Nuxt 3 · TypeScript · 6★',
+    // Deliberately points at the repository, not a demo: the deployed instance
+    // depends on a third-party API that no longer serves it. A dead demo is
+    // worse than no demo, and the code is still the thing worth reading.
+    dest: 'GitHub',
     href: 'https://github.com/isaactan98/shadow-anime'
   }
 ]
+
+const isExternal = (href: string) => href.startsWith('http')
 
 </script>
 
@@ -69,11 +93,11 @@ const work: { name: string; note: string; tech: string; href?: string }[] = [
   <main class="page-column pb-24">
       <!-- Hero -->
       <section class="reveal pt-12 sm:pt-16" style="--d: 0ms">
-        <h1 class="hero">Enterprise systems by day. A home server by night.</h1>
+        <h1 class="hero">Three years of internal tools. Every layer, down to the server.</h1>
         <p class="lede">
-          Full-stack engineer in Singapore, commuting from Johor Bahru. I build internal
-          tools for a living and self-host the rest &mdash; no third-party cloud, no open
-          ports.
+          Full-stack engineer in Singapore, commuting from Johor Bahru. Enterprise
+          systems by day; by night, a home server running the tools I actually use
+          &mdash; architecture, build, deploy and maintenance, all mine.
         </p>
       </section>
 
@@ -81,13 +105,39 @@ const work: { name: string; note: string; tech: string; href?: string }[] = [
         <HomelabDiagram planned />
       </section>
 
-      <p class="reveal mt-6 flex items-center gap-2 font-mono text-[0.75rem] text-ink-muted" style="--d: 160ms">
-        <span class="status-dot" aria-hidden="true" />
-        Open to freelance work
-      </p>
+      <!-- Selected work -->
+      <!-- Above the CV: the artifacts are the checkable half of this page. -->
+      <section id="work" class="section section--first section--reveal" style="--s: 2">
+        <div class="section-head">
+          <h2 class="section-label">Selected work</h2>
+          <NuxtLink to="/work" class="section-more">
+            All {{ repoCount }} repositories <span aria-hidden="true">&rarr;</span>
+          </NuxtLink>
+        </div>
+        <ul class="rows">
+          <li v-for="(row, i) in work" :key="row.name" :style="{ '--i': i }">
+            <!-- NuxtLink resolves external hrefs to a plain anchor itself, so one
+                 element covers both the case study and the GitHub rows. -->
+            <NuxtLink
+              :to="row.href"
+              :target="isExternal(row.href) ? '_blank' : undefined"
+              :rel="isExternal(row.href) ? 'noopener' : undefined"
+              class="row row--link"
+            >
+              <span class="cell-title">{{ row.name }}</span>
+              <span class="cell-note">{{ row.note }}</span>
+              <span class="cell-tech">{{ row.tech }}</span>
+              <span class="cell-dest">
+                {{ row.dest }}
+                <span class="cell-arrow" aria-hidden="true">{{ isExternal(row.href) ? '↗' : '→' }}</span>
+              </span>
+            </NuxtLink>
+          </li>
+        </ul>
+      </section>
 
       <!-- Experience -->
-      <section id="experience" class="section section--reveal" style="--s: 2">
+      <section id="experience" class="section section--reveal" style="--s: 3">
         <h2 class="section-label">Experience</h2>
         <ul class="rows">
           <li
@@ -109,44 +159,12 @@ const work: { name: string; note: string; tech: string; href?: string }[] = [
       </section>
 
       <!-- Stack -->
-      <section id="stack" class="section section--reveal" style="--s: 3">
+      <section id="stack" class="section section--reveal" style="--s: 4">
         <h2 class="section-label">Stack</h2>
         <ul class="rows">
           <li v-for="(row, i) in stack" :key="row.label" class="row row--stack" :style="{ '--i': i }">
             <span class="cell-year">{{ row.label }}</span>
             <span class="cell-title font-normal">{{ row.items }}</span>
-          </li>
-        </ul>
-      </section>
-
-      <!-- Selected work -->
-      <section id="work" class="section section--reveal" style="--s: 4">
-        <div class="section-head">
-          <h2 class="section-label">Selected work</h2>
-          <NuxtLink to="/work" class="section-more">
-            All {{ repoCount }} repositories <span aria-hidden="true">&rarr;</span>
-          </NuxtLink>
-        </div>
-        <ul class="rows">
-          <li v-for="(row, i) in work" :key="row.name" :style="{ '--i': i }">
-            <a
-              v-if="row.href"
-              :href="row.href"
-              target="_blank"
-              rel="noopener"
-              class="row row--link"
-            >
-              <span class="cell-title">{{ row.name }}</span>
-              <span class="cell-note">{{ row.note }}</span>
-              <span class="cell-tech">{{ row.tech }}</span>
-              <span class="cell-arrow" aria-hidden="true">&nearr;</span>
-            </a>
-            <div v-else class="row row--link row--static">
-              <span class="cell-title">{{ row.name }}</span>
-              <span class="cell-note">{{ row.note }}</span>
-              <span class="cell-tech">{{ row.tech }}</span>
-              <span class="cell-arrow" aria-hidden="true" />
-            </div>
           </li>
         </ul>
       </section>
@@ -198,6 +216,12 @@ const work: { name: string; note: string; tech: string; href?: string }[] = [
 .section {
   margin-top: 4.5rem;
   scroll-margin-top: 2rem;
+}
+
+/* The diagram's log panel is a fixed height and usually empty, so it already
+   ends in whitespace. A full section gap on top of that reads as a hole. */
+.section--first {
+  margin-top: 2.75rem;
 }
 
 .section-head {
@@ -252,13 +276,15 @@ const work: { name: string; note: string; tech: string; href?: string }[] = [
 }
 
 .row--link {
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.35fr) minmax(0, 0.85fr) 1.5rem;
+  /* The tech cell carries the actual evidence, so it gets enough room to read
+     in full — an ellipsed stack line proves nothing. */
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.05fr) minmax(0, 0.78fr) auto;
   transition: background-color 150ms ease;
   margin-inline: -0.75rem;
   padding-inline: 0.75rem;
 }
 
-.row--link:not(.row--static):hover {
+.row--link:hover {
   background-color: #f4f4f2;
 }
 
@@ -303,13 +329,31 @@ const work: { name: string; note: string; tech: string; href?: string }[] = [
   color: theme('colors.ink-faint');
 }
 
+/* Every work row names where it lands, so the click is never a surprise. */
+.cell-dest {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  font-family: theme('fontFamily.mono');
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: theme('colors.ink-faint');
+  white-space: nowrap;
+  transition: color 150ms ease;
+}
+
+.row--link:hover .cell-dest {
+  color: theme('colors.ink');
+}
+
 .cell-arrow {
   justify-self: end;
   color: theme('colors.ink-faint');
   transition: transform 150ms ease, color 150ms ease;
 }
 
-.row--link:not(.row--static):hover .cell-arrow {
+.row--link:hover .cell-arrow {
   transform: translate(2px, 0);
   color: theme('colors.ink');
 }
@@ -388,6 +432,15 @@ const work: { name: string; note: string; tech: string; href?: string }[] = [
     grid-column: 1 / -1;
     margin-top: 0.25rem;
   }
+  /* On a work row the destination takes the top-right slot the CV gives to
+     place, so the row still declares where it goes without the arrow drift. */
+  .row--link .cell-title {
+    grid-column: 1;
+  }
+  .cell-dest {
+    grid-column: 2;
+    grid-row: 1;
+  }
   .cell-arrow {
     display: none;
   }
@@ -398,6 +451,7 @@ const work: { name: string; note: string; tech: string; href?: string }[] = [
     animation: none;
   }
   .cell-arrow,
+  .cell-dest,
   .row--link,
   .nav-link {
     transition: none;

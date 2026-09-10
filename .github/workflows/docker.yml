@@ -1,0 +1,85 @@
+name: Build and publish image
+
+# Builds the site image and pushes it to GitHub Container Registry. The home
+# server pulls from there; nothing is built on the server itself, so a bad
+# build never reaches it and the box does no compilation work.
+
+on:
+  push:
+    branches: [master]
+    # Doc-only edits do not change the image.
+    paths-ignore:
+      - 'README.md'
+      - '.gitignore'
+  # Lets the deploy be re-cut without an empty commit.
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5
+
+      # Only needed for the arm64 runtime stage; the build stage runs natively
+      # on the amd64 runner (see the Dockerfile's BUILDPLATFORM note).
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # Provided automatically by Actions; no secret to manage.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+          labels: |
+            org.opencontainers.image.title=isaactan.work
+            org.opencontainers.image.description=Personal site — Nuxt 4, self-hosted
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Keeps npm ci and the Nuxt build warm between runs.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summarise
+        run: |
+          {
+            echo "### Image published"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo
+            echo "Pull it on the server with:"
+            echo '```sh'
+            echo "docker compose pull && docker compose up -d"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
