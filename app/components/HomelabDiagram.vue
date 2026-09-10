@@ -37,12 +37,28 @@ const wiresFor: Record<NodeId, string[]> = {
 
 const restText = 'The expense tracker runs here. So does this page.'
 
+/**
+ * The readout below the SVG now does double duty: what a node is, and — for
+ * the two nodes that run actual code — what it's built with and where that's
+ * proven. `site` has no entry in `nodeHref`: this page has no case study of
+ * its own, and TechList's answer to a missing href is plain text, not a link
+ * to somewhere that doesn't exist.
+ */
+const nodeStack: Partial<Record<NodeId, string[]>> = {
+  expense: ['Nuxt', 'Express', 'SQLite'],
+  site: ['Nuxt', 'Content']
+}
+const nodeHref: Partial<Record<NodeId, string>> = {
+  expense: '/work#expense'
+}
+
 const active = ref<NodeId | null>(null)
 const hit = ref<Target | null>(null)
 const sending = ref(false)
 const reducedMotion = ref(false)
 const log = ref<{ id: number; target: Target; ok: boolean }[]>([])
 const reqAnim = ref<SVGAnimateMotionElement | null>(null)
+const figureRef = ref<HTMLElement | null>(null)
 
 let seq = 0
 let nextTarget: Target = 'expense'
@@ -52,6 +68,30 @@ onMounted(() => {
 })
 
 const isHot = (wire: string) => active.value !== null && wiresFor[active.value].includes(wire)
+
+/**
+ * The readout can now hold a real, clickable link (a node's stack, its case
+ * study). Clearing `active` on each node's own mouseleave/blur — the
+ * original behaviour — hides that link before a mouse moving down into the
+ * readout ever arrives, and blurs it away before Tab can reach it. So
+ * individual nodes only ever *set* `active` now (`@mouseenter`/`@focus` on
+ * each node, unchanged); clearing it is handled once here, for the whole
+ * figure, on the way out.
+ *
+ * `mouseleave` on the figure already has the right semantics for the pointer
+ * case with no extra work — unlike `mouseover`/`mouseout`, it does not fire
+ * when the pointer moves between children inside the figure, only when it
+ * leaves the figure's bounds entirely. `focusout` has no such built-in
+ * boundary (it bubbles from every descendant, including on a Tab between two
+ * nodes inside the same figure), so it needs the explicit check below: only
+ * clear `active` when focus is leaving the figure altogether.
+ */
+function clearActiveIfLeavingFigure(event: FocusEvent) {
+  const next = event.relatedTarget as Node | null
+  if (!next || !figureRef.value?.contains(next)) {
+    active.value = null
+  }
+}
 
 function send() {
   if (sending.value) return
@@ -74,7 +114,12 @@ function send() {
 </script>
 
 <template>
-  <figure class="diagram">
+  <figure
+    ref="figureRef"
+    class="diagram"
+    @mouseleave="active = null"
+    @focusout="clearActiveIfLeavingFigure"
+  >
     <div class="diagram-scroll">
       <svg
         viewBox="0 0 880 260"
@@ -106,9 +151,7 @@ function send() {
           role="button"
           aria-label="You: send a request through the tunnel"
           @mouseenter="active = 'you'"
-          @mouseleave="active = null"
           @focus="active = 'you'"
-          @blur="active = null"
           @click="send"
           @keydown.enter.prevent="send"
           @keydown.space.prevent="send"
@@ -124,9 +167,7 @@ function send() {
           :class="{ 'node--active': active === 'tunnel' }"
           tabindex="0"
           @mouseenter="active = 'tunnel'"
-          @mouseleave="active = null"
           @focus="active = 'tunnel'"
-          @blur="active = null"
         >
           <rect class="box" x="196" y="96" width="156" height="58" rx="3" />
           <text class="lbl" x="212" y="121">Cloudflare Tunnel</text>
@@ -139,9 +180,7 @@ function send() {
           :class="{ 'node--active': active === 'server' }"
           tabindex="0"
           @mouseenter="active = 'server'"
-          @mouseleave="active = null"
           @focus="active = 'server'"
-          @blur="active = null"
         >
           <rect class="box box--outer" x="420" y="24" width="440" height="212" rx="4" />
           <text class="lbl" x="436" y="46">home server</text>
@@ -155,9 +194,7 @@ function send() {
           :class="{ 'node--active': active === 'expense', 'node--hit': hit === 'expense' }"
           tabindex="0"
           @mouseenter="active = 'expense'"
-          @mouseleave="active = null"
           @focus="active = 'expense'"
-          @blur="active = null"
         >
           <rect class="box" x="436" y="88" width="196" height="50" rx="3" />
           <circle class="live" cx="450" cy="106" r="3" />
@@ -170,9 +207,7 @@ function send() {
           :class="{ 'node--active': active === 'site', 'node--hit': hit === 'site' }"
           tabindex="0"
           @mouseenter="active = 'site'"
-          @mouseleave="active = null"
           @focus="active = 'site'"
-          @blur="active = null"
         >
           <rect class="box" :class="{ 'box--ghost': planned }" x="648" y="88" width="196" height="50" rx="3" />
           <circle v-if="!planned" class="live" cx="662" cy="106" r="3" />
@@ -186,9 +221,7 @@ function send() {
           :class="{ 'node--active': active === 'laptop' }"
           tabindex="0"
           @mouseenter="active = 'laptop'"
-          @mouseleave="active = null"
           @focus="active = 'laptop'"
-          @blur="active = null"
         >
           <rect class="box" x="196" y="178" width="156" height="58" rx="3" />
           <text class="lbl" x="212" y="203">isaac · laptop</text>
@@ -217,10 +250,20 @@ function send() {
     </button>
 
     <div class="diagram-readout">
-      <p class="diagram-inspect" aria-live="polite">
-        <span class="diagram-inspect__marker" aria-hidden="true">{{ active ? '▸' : '·' }}</span>
-        {{ active ? detail[active] : restText }}
-      </p>
+      <div class="diagram-inspect-group">
+        <p class="diagram-inspect" aria-live="polite">
+          <span class="diagram-inspect__marker" aria-hidden="true">{{ active ? '▸' : '·' }}</span>
+          {{ active ? detail[active] : restText }}
+        </p>
+        <!-- Only the two nodes that run real code have a stack to show; the
+             others (you, tunnel, laptop) stay one-line. -->
+        <p v-if="active && nodeStack[active]" class="diagram-inspect__stack">
+          <TechList :items="nodeStack[active]!" :href="nodeHref[active]" />
+          <NuxtLink v-if="nodeHref[active]" :to="nodeHref[active]!" class="diagram-inspect__case">
+            Case study <span aria-hidden="true">&rarr;</span>
+          </NuxtLink>
+        </p>
+      </div>
       <span class="diagram-hint" aria-hidden="true">scroll &rarr;</span>
       <span class="diagram-meta">live demo on request</span>
     </div>
@@ -240,6 +283,11 @@ function send() {
         </li>
       </TransitionGroup>
     </div>
+
+    <figcaption class="diagram-caption">
+      This diagram used to draw isaactan.work dashed and report every request to
+      it as "not here yet." It's solid now because the page finally is.
+    </figcaption>
   </figure>
 </template>
 
@@ -501,9 +549,17 @@ function send() {
   font-size: 0.75rem;
   color: theme('colors.ink-muted');
 }
+/* Takes over .diagram-inspect's old flex role, since the group now also
+   holds the stack/case-study line. Reserves height for that second line
+   whether or not it's currently rendered, so hovering a node never shifts
+   the log panel below — the same fixed-height approach that panel already
+   uses for its own three log lines. */
+.diagram-inspect-group {
+  flex: 1 1 24rem;
+  min-height: 2.85em;
+}
 .diagram-inspect {
   margin: 0;
-  flex: 1 1 24rem;
   min-height: 1.5em;
 }
 .diagram-inspect__marker {
@@ -511,6 +567,17 @@ function send() {
   width: 1ch;
   margin-right: 0.5ch;
   color: theme('colors.ink-faint');
+}
+.diagram-inspect__stack {
+  margin: 0.35rem 0 0;
+}
+.diagram-inspect__case {
+  margin-left: 0.75rem;
+  color: theme('colors.ink-faint');
+  transition: color 150ms ease;
+}
+.diagram-inspect__case:hover {
+  color: theme('colors.ink');
 }
 .diagram-meta {
   white-space: nowrap;
@@ -585,6 +652,16 @@ function send() {
   transition: transform 220ms ease;
 }
 
+/* ---- Caption ---------------------------------------------------------- */
+
+.diagram-caption {
+  margin-top: 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: theme('colors.ink-faint');
+  max-width: 52ch;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .live,
   .wire--dash,
@@ -595,7 +672,8 @@ function send() {
   .wire,
   .arrow,
   .packet--req,
-  .diagram-send {
+  .diagram-send,
+  .diagram-inspect__case {
     transition: none;
   }
   .log-enter-active,
