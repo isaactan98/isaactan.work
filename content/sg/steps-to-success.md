@@ -1,6 +1,9 @@
 ---
 title: Steps to Success
 description: Placeholder working notes used to verify the MDC component set.
+date: '2026-02-09'
+tags:
+  - Career
 ---
 
 ::page-header{icon="🇸🇬" cover="/covers/singapore.svg" title="Steps to Success"}

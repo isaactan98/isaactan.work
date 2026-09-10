@@ -131,6 +131,48 @@ real GitHub API values read on 2026-09-10; pure tutorial repos are excluded.
 The case-study accordion animates height with a `grid-template-rows: 0fr -> 1fr`
 transition, so nothing is measured in JavaScript.
 
+### Writing indexes
+
+`/jb` and `/sg` list everything under `content/jb/` and `content/sg/`. Both are
+thin pages (`app/pages/jb.vue`, `app/pages/sg.vue`) over one component,
+`app/components/WritingIndex.vue` — the controls are lifted from `/work` (filter
+chips with live counts, a recent/oldest toggle, a `TransitionGroup` that reflows
+rather than snaps) so a reader recognises them instead of learning them twice.
+On top of those there is a live text filter matching title, description **and**
+tags, so typing `career` finds a post whose title never says it; Escape clears
+it. Filtering to nothing gives a real empty state rather than a blank page.
+
+They are static routes, so they win the match against `[...slug].vue` while
+posts one level deeper (`/jb/japan-trip`) still fall through to it as before.
+
+`content.config.ts` adds three optional frontmatter fields on top of what
+`type: 'page'` already supplies:
+
+```yaml
+---
+title: The Causeway Commute
+description: What two hours a day at a border crossing does to your calendar.
+date: '2026-06-12'     # quote it — bare YAML dates parse as timestamps, not strings
+tags: [Commute, Travel]
+draft: true            # optional; keeps it out of the index
+---
+```
+
+Everything is optional or defaulted deliberately: a post missing its frontmatter
+still builds and still lists, just without a date. A schema that rejects a
+half-finished draft is a schema that stops you writing.
+
+`draft: true` is excluded **in the query**, not in a computed, so an unfinished
+post's title never reaches the client. It stays reachable by direct URL, which
+is what makes it useful for sharing a work in progress.
+
+The landing page's Writing section reads its counts from the same query at
+request time, so it cannot advertise a number the indexes disagree with. It
+renders only when something is published — an empty section reads as abandoned.
+
+> If a date change does not show up in dev, the content database is stale.
+> `rm -rf .data` and restart; Nuxt Content caches parsed frontmatter there.
+
 ### Shared chrome and page transitions
 
 `app/layouts/site.vue` holds the header, and `/` and `/work` opt into it with
