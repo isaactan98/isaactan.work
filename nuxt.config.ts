@@ -21,6 +21,12 @@ export default defineNuxtConfig({
 
     head: {
       htmlAttrs: { lang: 'en' },
+
+      // The address bar and the tab strip either side of the page. `theme-color`
+      // is the canvas, so mobile Chrome's chrome continues the page rather than
+      // sitting against it in default grey.
+      meta: [{ name: 'theme-color', content: '#fbfbfa' }],
+
       link: [
         { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
         { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
@@ -31,7 +37,18 @@ export default defineNuxtConfig({
             '?family=Inter:wght@400;500;600;700' +
             '&family=IBM+Plex+Mono:wght@400;500;600' +
             '&display=swap'
-        }
+        },
+
+        // Icons. `.ico` is declared first and carries `sizes`, so a browser that
+        // cannot read SVG picks it without guessing; anything modern prefers the
+        // vector on the line below and scales it without a raster step.
+        // See scripts/generate-icons.mjs — the rasters are rendered from
+        // favicon.svg, so edit the SVG and re-run rather than touching a PNG.
+        { rel: 'icon', href: '/favicon.ico', sizes: '32x32' },
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        // iOS ignores the manifest icons when adding to the home screen.
+        { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+        { rel: 'manifest', href: '/site.webmanifest' }
       ]
     }
   },
