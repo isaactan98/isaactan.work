@@ -8,11 +8,16 @@ ARG NODE_IMAGE=node:22-alpine
 
 # ---- build ------------------------------------------------------------------
 # Pinned to the *builder's* own architecture rather than the target's.
+#
 # better-sqlite3 ships prebuilt binaries for every platform it supports
-# (linux-x64, linux-arm64 and the musl variants of both), so the bundle this
-# stage produces already runs on any of them. There is nothing to cross-compile,
-# and emulating an npm install + Nuxt build under QEMU would cost several
-# minutes per architecture for an identical result.
+# (linux-x64, linux-arm64 and the musl variants of both) and picks one at
+# runtime: lib/binding.js resolves prebuilds/${platform}-${arch}.node, detecting
+# musl from the absence of glibcVersionRuntime. Nothing is chosen at build time,
+# so the bundle this stage produces runs unmodified on any of those targets.
+#
+# There is therefore nothing to cross-compile, and emulating an npm install plus
+# a Nuxt build under QEMU would cost minutes per architecture for a byte-identical
+# result. Only the runtime stage below varies per target.
 FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS build
 
 WORKDIR /app
@@ -20,7 +25,24 @@ WORKDIR /app
 # .npmrc carries legacy-peer-deps, without which npm 10.9.x crashes resolving
 # Nuxt's optional peer dependencies. It has to be present before `npm ci` runs.
 COPY package.json package-lock.json .npmrc ./
-RUN npm ci
+
+# --ignore-scripts is required here, not merely tidy.
+#
+# better-sqlite3 ships a binding.gyp, so npm runs `node-gyp rebuild` for it
+# regardless of anything in the lockfile. That build is a no-op — binding.gyp
+# executes lib/binding.js, sees a matching prebuilt binary and compiles nothing
+# (there is never a build/Release/*.node) — but node-gyp still needs Python
+# just to evaluate the gyp file, and this image has none. The install dies
+# before it can decide to do nothing.
+#
+# Skipping install scripts avoids that entirely: the prebuilt binaries ship in
+# the package and lib/binding.js resolves them at runtime by platform, arch and
+# libc, ahead of any node-gyp output. It also stops dependencies executing
+# arbitrary code at install time, which is worth having on its own.
+#
+# The root postinstall (`nuxt prepare`) is skipped too; `nuxt build` performs
+# the same preparation itself, verified against a clean install.
+RUN npm ci --ignore-scripts
 
 # Manifests are copied separately above so this layer — the expensive one — is
 # only invalidated when a dependency actually changes.
