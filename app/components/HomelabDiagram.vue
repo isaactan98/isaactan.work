@@ -3,8 +3,11 @@
  * The landing page's signature: a diagram of the setup Isaac actually runs,
  * and a small simulation of a request travelling through it.
  *
- * Only what the site states is drawn solid. isaactan.work is dashed until it
- * is deployed there — flip `planned` off in the deploy phase.
+ * Only what the site states is drawn solid. `planned` dashes the isaactan.work
+ * node and makes a simulated request to it report "not here yet"; it came off
+ * once this page was genuinely served from the box drawn here. Keep the prop:
+ * if the site moves off that hardware, one word puts the diagram back in step
+ * with reality.
  */
 const props = defineProps<{ planned?: boolean }>()
 
@@ -32,7 +35,7 @@ const wiresFor: Record<NodeId, string[]> = {
   laptop: ['w3']
 }
 
-const restText = 'The expense tracker runs here today. This site will too.'
+const restText = 'The expense tracker runs here. So does this page.'
 
 const active = ref<NodeId | null>(null)
 const hit = ref<Target | null>(null)

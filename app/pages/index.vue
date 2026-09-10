@@ -102,7 +102,9 @@ const isExternal = (href: string) => href.startsWith('http')
       </section>
 
       <section class="reveal mt-9" style="--d: 90ms">
-        <HomelabDiagram planned />
+        <!-- `planned` dropped on the day this page started being served from the
+             box it draws. The site node is solid now because it is true. -->
+        <HomelabDiagram />
       </section>
 
       <!-- Selected work -->

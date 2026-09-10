@@ -101,9 +101,12 @@ page's one interactive object:
 - On load, boxes settle and wires draw themselves left to right; the
   Tailscale link marches; live containers breathe.
 
-Only what the site states is drawn solid. `isaactan.work` is dashed via the
-`planned` prop, and a simulated request to it honestly reports "not here yet"
-— flip the prop off in the deploy phase and it goes solid with a live dot.
+Only what the site states is drawn solid. The `planned` prop draws the
+`isaactan.work` node dashed and makes a simulated request to it report "not here
+yet" instead of `200 OK`. It was set for as long as that was true; it came off
+the day this page started being served from the box the diagram draws. The prop
+stays in place — if the site ever moves off that hardware, the diagram goes back
+to telling the truth with a one-word change.
 
 Section load-in is a plain CSS animation in `app/assets/css/tailwind.css`
 (`.section--reveal`), staggered per section via `--s` and per row via `--i`.
