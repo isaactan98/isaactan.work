@@ -1,16 +1,26 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'site' })
 
-useSeoMeta({
+usePageSeo({
   title: 'Work — Isaac Tan',
   description:
-    'Three case studies and seventeen public repositories — self-hosted tools, real-time systems and web apps.'
+    'Three case studies and fourteen repositories — self-hosted tools, real-time systems and web apps.',
+  path: '/work'
 })
 
 /**
  * Case-study copy is Isaac's own, carried over from isaactan.vercel.app.
  * Repository descriptions, languages and star counts are the real values from
  * the GitHub API, read on 2026-09-10.
+ *
+ * TODO(isaac): the `result` bullets are the weakest lines on the site. With the
+ * employer unnamed on `/`, these are the only load-bearing evidence a reader
+ * can weigh, and "a daily driver, used every day" is an assertion, not a
+ * result. Replace each with something falsifiable — months in continuous use,
+ * transactions recorded, uptime, one production bug and the commit that fixed
+ * it, and why SQLite rather than Postgres for this workload. That last one is
+ * the "can you explain your own architecture" test in a single line, and it is
+ * the question an interviewer will actually ask.
  */
 type Case = {
   id: string
@@ -100,16 +110,20 @@ type Repo = {
   tags: string[]
 }
 
+/**
+ * A selection, not a dump. Three repositories are deliberately not listed:
+ * two carried no description worth reading, and `sg-nric-generator` — however
+ * legitimate as test data — is the wrong thing to put in a shop window aimed
+ * at Singapore employers while the PDPC's NRIC rules are live.
+ * Nothing here is padding; every row earns its line.
+ */
 const repos: Repo[] = [
   { name: 'ws-opener', desc: 'Opens the WhatsApp app from a browser with a phone number.', lang: 'Vue', stars: 0, date: '2026-09', tags: ['Tooling'] },
   { name: 'LunchSpin', desc: 'Food-decision PWA for Singapore — picks a restaurant by mall, company, budget and meal type.', lang: 'Vue', stars: 0, date: '2026-07', tags: ['Web app'] },
-  { name: 'car-community-app', desc: '', lang: 'TypeScript', stars: 0, date: '2026-07', tags: ['Web app'] },
   { name: 'car-import-calculator', desc: 'Estimates total vehicle import costs — taxes, duties, GST, freight and registration.', lang: 'Vue', stars: 0, date: '2026-04', tags: ['Web app', 'Tooling'] },
   { name: 'crewai-osint', desc: 'Practice running red-team tests against an LLM.', lang: null, stars: 0, date: '2025-09', tags: ['Tooling'] },
   { name: 'anime-nuxt-app', desc: 'The original anime streaming platform, later rebuilt as Shadow Anime.', lang: 'Vue', stars: 14, date: '2025-05', tags: ['Web app'] },
-  { name: 'anime-m3uproxy', desc: '', lang: 'TypeScript', stars: 1, date: '2025-05', tags: ['Tooling'] },
   { name: 'shadow-anime', desc: 'The rebuilt streaming platform. See the case study above.', lang: 'Vue', stars: 6, date: '2025-01', tags: ['Web app'] },
-  { name: 'sg-nric-generator', desc: 'Test-data generator, T prefix only.', lang: 'HTML', stars: 0, date: '2024-12', tags: ['Tooling'] },
   { name: 'express-consument', desc: 'Search API for anime, film and television, books, light novels and manga.', lang: 'TypeScript', stars: 2, date: '2024-12', tags: ['Tooling'] },
   { name: 'admin-panel-template', desc: 'Laravel 10 admin panel starter with user management.', lang: 'Blade', stars: 1, date: '2024-07', tags: ['Tooling'] },
   { name: 'malaysia_covid_site', desc: 'COVID-19 statistics for Malaysia. Unsponsored, free to use.', lang: 'PHP', stars: 4, date: '2023-12', tags: ['Web app', 'Early work'] },
@@ -126,6 +140,19 @@ type Filter = (typeof filters)[number]
 const activeFilter = ref<Filter>('All')
 const sortBy = ref<'recent' | 'stars'>('recent')
 const openCase = ref<string | null>(cases[0]!.id)
+
+// The landing page links straight at a case study (`/work#expense`), so a hash
+// that names one opens it and scrolls to it rather than landing at the top.
+const route = useRoute()
+onMounted(async () => {
+  const id = route.hash.slice(1)
+  if (!id || !cases.some((c) => c.id === id)) return
+  openCase.value = id
+  // Wait for the accordion to expand before scrolling, or the target is still
+  // a zero-height row and the page lands in the wrong place.
+  await nextTick()
+  document.getElementById(id)?.scrollIntoView({ block: 'center' })
+})
 
 const countFor = (f: Filter) => (f === 'All' ? repos.length : repos.filter((r) => r.tags.includes(f)).length)
 
@@ -154,9 +181,9 @@ const year = (d: string) => d.slice(0, 4)
       <h1 class="title">Three worth writing up, and everything else.</h1>
       <p class="lede">
         Side projects, mostly. A few solve a problem I actually had; the rest were
-        built to understand something. Star counts are real and read from the GitHub
-        API on 10 September 2026 &mdash; {{ totalStars }} across {{ repos.length }} public
-        repositories.
+        built to understand something. {{ repos.length }} repositories worth showing,
+        {{ totalStars }} stars between them &mdash; counts read from the GitHub API on
+        10 September 2026.
       </p>
     </section>
 
@@ -164,7 +191,7 @@ const year = (d: string) => d.slice(0, 4)
     <section class="section">
       <h2 class="section-label">Case studies</h2>
       <ul class="cases">
-        <li v-for="c in cases" :key="c.id" class="case" :class="{ 'case--open': openCase === c.id }">
+        <li v-for="c in cases" :key="c.id" :id="c.id" class="case" :class="{ 'case--open': openCase === c.id }">
           <h3 class="case-headrow">
             <button
               type="button"
