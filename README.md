@@ -119,6 +119,42 @@ Portrait: `public/me-badge.png` (150x240, alpha) is the header badge, made
 with `sips -Z 240` from `public/me.png` (720x1148, 724 KB), which nothing
 references yet — drop it if no larger use turns up.
 
+### Icon
+
+The favicon is one node lifted out of the homelab diagram: a hairline box on
+canvas carrying a live status dot and its label bar — the `● expense-tracker`
+row, reduced until it survives 16px. It means the same thing the diagram's
+`signal` green means everywhere else on this site: still running. There is no
+monogram, because there is no wordmark to abbreviate.
+
+`public/favicon.svg` is the source. Every raster is rendered from it:
+
+| File | Where it is used |
+|---|---|
+| `favicon.svg` | every modern browser; Safari 26+ uses it in tabs, Favorites and the start page |
+| `favicon.ico` | 16 + 32 + 48, for anything that cannot read the SVG |
+| `apple-touch-icon.png` | 180x180, opaque — iOS ignores the manifest when adding to the home screen |
+| `icon-192.png`, `icon-512.png` | Android home screen and the install dialog |
+| `site.webmanifest` | name, theme colour, the two PNG icons |
+
+Edit the SVG, then re-render — never hand-edit a PNG:
+
+```bash
+npm i --no-save --package-lock=false sharp png-to-ico
+node scripts/generate-icons.mjs public
+```
+
+Two constraints in that script are easy to break by accident, and both are
+commented at the top of it. The master's `x=3`, `width=26` and `stroke-width=2`
+put the box edges on whole pixels at 16, 32 **and** 48 — anything else smears
+the outline across two rows of half-lit pixels at tab size. And the home-screen
+tiles use a lighter stroke ratio than the master: 7.7% of the box reads as a
+hairline at 16px and as a heavy slab at 512px, so the large sizes are optically
+adjusted rather than scaled.
+
+The box is filled with `canvas`, not left transparent, which is what keeps the
+mark legible on a dark tab strip without a second dark-mode file.
+
 Project star counts in `index.vue` are from the GitHub API on 2026-09-09.
 
 ### Work page

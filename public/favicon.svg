@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" role="img" aria-label="isaactan.work">
+  <title>isaactan.work</title>
+  <!-- A node from the homelab diagram: one box, one container still running. -->
+  <rect x="3" y="3" width="26" height="26" rx="4" fill="#fbfbfa" stroke="#37352f" stroke-width="2"/>
+  <circle cx="11.5" cy="16" r="4" fill="#4a8f5b"/>
+  <rect x="17.5" y="14" width="7" height="4" rx="2" fill="#37352f"/>
+</svg>
