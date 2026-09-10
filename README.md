@@ -182,11 +182,27 @@ push to master ──▶ .github/workflows/docker.yml ──▶ ghcr.io/isaactan
 `npm ci` and `nuxt build` always run natively on the amd64 runner rather than
 under emulation; only the runtime stage varies per architecture. This works
 because `better-sqlite3` ships prebuilt binaries for linux x64 and arm64, glibc
-and musl alike, so the Nitro bundle produced on one architecture runs on all of
-them. Images are published for `linux/amd64` and `linux/arm64`.
+and musl alike, and selects one *at runtime* — `lib/binding.js` resolves
+`prebuilds/${platform}-${arch}.node`, detecting musl from the absence of
+`glibcVersionRuntime`. Nothing is bound at build time, so one bundle runs on all
+of them. Images are published for `linux/amd64` and `linux/arm64`.
 
 The runtime stage installs nothing — `nuxt build` emits a self-contained server
 under `.output`, its dependencies included.
+
+#### Why `npm ci --ignore-scripts`
+
+Required, not tidiness. `better-sqlite3` ships a `binding.gyp`, so npm runs
+`node-gyp rebuild` for it whatever the lockfile says. That build is a no-op —
+`binding.gyp` executes `lib/binding.js`, finds a matching prebuilt binary and
+compiles nothing, which is why there is never a `build/Release/*.node` — but
+node-gyp still needs Python merely to evaluate the gyp file, and the Alpine
+image has none. The install dies before it can decide to do nothing.
+
+Skipping install scripts sidesteps it: the prebuilds are already in the package
+and are resolved ahead of any node-gyp output. The root `postinstall`
+(`nuxt prepare`) is skipped too, and `nuxt build` performs the same preparation
+itself. As a side benefit, no dependency executes arbitrary code at install time.
 
 ### On the server
 
