@@ -219,12 +219,22 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u isaactan98 --password-stdin
 
 Making the package public in the repository's Package settings removes that step.
 
-Port 3000 is bound to loopback, not `0.0.0.0`: the only thing that should reach
-it is `cloudflared` on the same host. Nothing is exposed to the LAN and no port
-is forwarded on the router — which is exactly what the diagram on the landing
-page claims, so it needs to stay true. If `cloudflared` runs as a container
-instead, swap the `ports` block for the shared network commented out in
-`compose.yml`.
+The host port is bound to loopback, not `0.0.0.0`: the only thing that should
+reach it is `cloudflared` on the same host. Nothing is exposed to the LAN and no
+port is forwarded on the router — which is exactly what the diagram on the
+landing page claims, so it needs to stay true. If `cloudflared` runs as a
+container instead, swap the `ports` block for the shared network commented out
+in `compose.yml`.
+
+The published port is **8168**, not 3000 — 3000 is heavily contested on a
+homelab (Grafana and half of npm default to it). Only the host side moved; the
+container still listens on 3000, so the Dockerfile's `ENV`, `EXPOSE` and
+healthcheck are unchanged. Point the tunnel at `http://localhost:8168`.
+
+Anything replacing it wants to be above 1024 (no privilege needed), below 32768
+(the ephemeral range this box allocates outgoing connections from — check with
+`cat /proc/sys/net/ipv4/ip_local_port_range`), and clear of the usual squatters:
+9000 is Portainer, 8888 Jupyter, 8080 http-alt, 1688 Microsoft KMS.
 
 ### Two things worth knowing
 

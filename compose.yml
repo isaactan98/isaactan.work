@@ -19,10 +19,16 @@ services:
     # router keeps no forwarded port — which is what the diagram on the site
     # claims, so it had better stay true.
     #
+    # Only the host side moved off 3000. The container still listens on 3000
+    # internally, so the Dockerfile's ENV, EXPOSE and healthcheck all stay as
+    # they are — one number to change instead of four. 8168 avoids Portainer
+    # (9000), Jupyter (8888) and http-alt (8080), sits below the 32768 ephemeral
+    # floor, and is above 1024 so it needs no privilege.
+    #
     # If cloudflared runs as a container instead, drop this block, uncomment
     # the network below, and point the tunnel at http://site:3000.
     ports:
-      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:8168:3000'
 
     environment:
       NODE_ENV: production
