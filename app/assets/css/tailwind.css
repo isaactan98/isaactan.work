@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Full-bleed page covers use 100vw; keep the extra scrollbar width from
+       creating a horizontal scrollbar. */
+    overflow-x: hidden;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    line-height: 1.6;
+  }
+
+  ::selection {
+    background-color: #d3e5f5;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+}
+
+@layer components {
+  /* Centred Notion-style reading column. */
+  .content-column {
+    @apply mx-auto w-full max-w-content px-6;
+  }
+
+  /* Landing page column — a little wider than the reading column so the CV
+     table has room for its four columns. */
+  .page-column {
+    @apply mx-auto w-full max-w-page px-6;
+  }
+
+  /* Content pages: generous vertical breathing room. A page cover cancels the
+     top padding via --page-top-padding so it sits flush with the viewport. */
+  .content-page {
+    --page-top-padding: 4rem;
+    padding-top: var(--page-top-padding);
+    padding-bottom: 8rem;
+  }
+
+  /* ---- Section load-in ---------------------------------------------
+     A CSS animation rather than an IntersectionObserver: it always runs to
+     completion on its own, so a section can never be left invisible by a
+     callback that did not fire (a background tab throttles both observer
+     callbacks and timers). Each row arrives on its own beat, so a section
+     assembles like a listing being written out. */
+
+  .section--reveal .section-label,
+  .section--reveal .rows > li,
+  .section--reveal .contact-line {
+    animation: section-in 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--s, 0) * 90ms + var(--i, 0) * 55ms);
+  }
+
+  @keyframes section-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .section--reveal .section-label,
+    .section--reveal .rows > li,
+    .section--reveal .contact-line {
+      animation: none;
+    }
+  }
+
+  /* Escape the reading column and span the viewport (page covers). */
+  .full-bleed {
+    width: 100vw;
+    margin-left: calc(50% - 50vw);
+  }
+}
+
+/* Vue adds these classes at runtime only, so they must sit outside
+   @layer components — Tailwind purges layer rules whose class names never
+   appear in the scanned source. */
+/* ---- Page transition ----------------------------------------------
+   Paired with app.pageTransition in nuxt.config. The outgoing page settles
+   down and out; the incoming one rises into place, so navigating reads as
+   one surface moving rather than two documents swapping. */
+
+.page-enter-active {
+  transition:
+    opacity 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.page-leave-active {
+  transition:
+    opacity 180ms ease-in,
+    transform 180ms ease-in;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: none;
+  }
+  .page-enter-from,
+  .page-leave-to {
+    opacity: 1;
+    transform: none;
+  }
+}
