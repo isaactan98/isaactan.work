@@ -1,6 +1,9 @@
 ---
 title: Japan Trip
 description: Placeholder travel notes used to verify the MDC component set.
+date: '2026-04-18'
+tags:
+  - Travel
 ---
 
 ::page-header{icon="🗾" cover="/covers/japan.svg"}

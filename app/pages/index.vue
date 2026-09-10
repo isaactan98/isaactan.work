@@ -87,6 +87,36 @@ const work: Work[] = [
 
 const isExternal = (href: string) => href.startsWith('http')
 
+/**
+ * Counts for the two writing sections, read at request time so the landing page
+ * cannot claim a number the indexes disagree with. Drafts are excluded here for
+ * the same reason they are excluded there.
+ */
+const { data: writingCounts } = await useAsyncData('writing:counts', async () => {
+  const count = (section: string) =>
+    queryCollection('content')
+      .where('path', 'LIKE', `/${section}/%`)
+      .where('draft', '=', false)
+      .count()
+  const [jb, sg] = await Promise.all([count('jb'), count('sg')])
+  return { jb, sg }
+})
+
+const writing = computed(() => [
+  {
+    name: 'Johor Bahru',
+    note: 'Travel, the homelab, and the side of the border I sleep on',
+    href: '/jb',
+    n: writingCounts.value?.jb ?? 0
+  },
+  {
+    name: 'Singapore',
+    note: 'Engineering, career, and what the commute teaches you',
+    href: '/sg',
+    n: writingCounts.value?.sg ?? 0
+  }
+])
+
 </script>
 
 <template>
@@ -171,8 +201,33 @@ const isExternal = (href: string) => href.startsWith('http')
         </ul>
       </section>
 
+      <!-- Writing -->
+      <!-- Only rendered once something is published: an empty section reads as
+           abandoned, which is worse than not mentioning it at all. -->
+      <section
+        v-if="writing.some((w) => w.n > 0)"
+        id="writing"
+        class="section section--reveal"
+        style="--s: 5"
+      >
+        <h2 class="section-label">Writing</h2>
+        <ul class="rows">
+          <li v-for="(row, i) in writing.filter((w) => w.n > 0)" :key="row.href" :style="{ '--i': i }">
+            <NuxtLink :to="row.href" class="row row--link">
+              <span class="cell-title">{{ row.name }}</span>
+              <span class="cell-note">{{ row.note }}</span>
+              <span class="cell-tech">{{ row.n }} {{ row.n === 1 ? 'entry' : 'entries' }}</span>
+              <span class="cell-dest">
+                Read
+                <span class="cell-arrow" aria-hidden="true">→</span>
+              </span>
+            </NuxtLink>
+          </li>
+        </ul>
+      </section>
+
       <!-- Contact -->
-      <section id="contact" class="section section--reveal" style="--s: 5">
+      <section id="contact" class="section section--reveal" style="--s: 6">
         <h2 class="section-label">Contact</h2>
         <div class="contact-line flex flex-wrap items-baseline justify-between gap-x-8 gap-y-3 border-t border-line pt-4">
           <a
