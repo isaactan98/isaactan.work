@@ -34,13 +34,6 @@ const experience: Row[] = [
   { year: '2018', role: 'Diploma in Computer Science', org: 'UTM', place: 'MY' }
 ]
 
-const stack: { label: string; items: string }[] = [
-  { label: 'Frontend', items: 'Nuxt · Vue · TypeScript · Tailwind CSS' },
-  { label: 'Backend', items: 'FastAPI · Express · Node.js' },
-  { label: 'Data', items: 'PostgreSQL · SQLite' },
-  { label: 'Infra', items: 'Docker Compose · Cloudflare Tunnel · Tailscale · CasaOS' }
-]
-
 // Star counts are from the GitHub API on 2026-09-10.
 const repoCount = 14
 
@@ -52,14 +45,22 @@ const repoCount = 14
  * Every row must resolve somewhere. `dest` names what the reader lands on so
  * the click is never a surprise; a row with no destination does not belong on
  * this page.
+ *
+ * There is deliberately no separate "Stack" section any more. A technology
+ * only appears here, attached to the row that actually proves it — `tech` is
+ * a list precisely so each entry can be its own link via TechList, not one
+ * more unverifiable line in a skills list. This does mean PostgreSQL and
+ * FastAPI are gone from the page entirely: neither has a project here that
+ * proves it, and a bare word with nothing behind it is exactly what this
+ * redesign exists to remove.
  */
-type Work = { name: string; note: string; tech: string; dest: string; href: string }
+type Work = { name: string; note: string; tech: string[]; meta?: string; dest: string; href: string }
 
 const work: Work[] = [
   {
     name: 'Expense Tracker',
     note: 'Dual-currency SGD/MYR PWA, offline-first, self-hosted',
-    tech: 'Nuxt · Express · SQLite',
+    tech: ['Nuxt', 'Express', 'SQLite'],
     // Self-hosted, so there is no public URL to give yet. The case study is a
     // real destination in the meantime — problem, build, stack and outcome.
     // TODO(deploy): swap for the tunnel URL once the box is exposed.
@@ -69,14 +70,16 @@ const work: Work[] = [
   {
     name: 'Nuxt Video Chat',
     note: 'Peer-to-peer video from ICE and SDP up — no video SDK',
-    tech: 'Socket.io · WebRTC · 7★',
+    tech: ['Socket.io', 'WebRTC'],
+    meta: '7★',
     dest: 'GitHub',
     href: 'https://github.com/isaactan98/nuxt_video_chat_app'
   },
   {
     name: 'Shadow Anime',
     note: 'Streaming front end over a public anime API',
-    tech: 'Nuxt 3 · TypeScript · 6★',
+    tech: ['Nuxt', 'TypeScript'],
+    meta: '6★',
     // Deliberately points at the repository, not a demo: the deployed instance
     // depends on a third-party API that no longer serves it. A dead demo is
     // worse than no demo, and the code is still the thing worth reading.
@@ -86,6 +89,30 @@ const work: Work[] = [
 ]
 
 const isExternal = (href: string) => href.startsWith('http')
+
+/**
+ * The pattern behind the side projects, named rather than left for a reader
+ * to notice on their own: most of them exist because something about the
+ * daily JB↔SG grind didn't work. This is the site's "personality" content —
+ * not invented biography, just the existing pattern in what he chose to
+ * build, made explicit. Rendered inline in the hero lede, not a new section.
+ *
+ * `after` (below) is the separator text following each link in the sentence —
+ * computed here rather than in the template so the markup doesn't have to
+ * juggle whitespace-sensitive conditionals between adjacent inline elements.
+ */
+const throughlineRaw: { name: string; href: string }[] = [
+  { name: 'car-import-calculator', href: 'https://github.com/isaactan98/car-import-calculator' },
+  { name: 'LunchSpin', href: 'https://github.com/isaactan98/LunchSpin' },
+  { name: 'ws-opener', href: 'https://github.com/isaactan98/ws-opener' },
+  { name: 'the expense tracker', href: '/work#expense' }
+]
+
+const throughline = throughlineRaw.map((t, i) => ({
+  ...t,
+  after:
+    i === throughlineRaw.length - 1 ? '.' : i === throughlineRaw.length - 2 ? ' and ' : ', '
+}))
 
 /**
  * Counts for the two writing sections, read at request time so the landing page
@@ -127,7 +154,16 @@ const writing = computed(() => [
         <p class="lede">
           Full-stack engineer in Singapore, commuting from Johor Bahru. Enterprise
           systems by day; by night, a home server running the tools I actually use
-          &mdash; architecture, build, deploy and maintenance, all mine.
+          &mdash; architecture, build, deploy and maintenance, all mine. Most of what
+          follows exists because commuting, spending or deciding where to eat across
+          a border got annoying enough to fix &mdash;
+          <span v-for="t in throughline" :key="t.href">
+            <NuxtLink
+              :to="t.href"
+              :target="isExternal(t.href) ? '_blank' : undefined"
+              :rel="isExternal(t.href) ? 'noopener' : undefined"
+              class="lede-link"
+            >{{ t.name }}</NuxtLink>{{ t.after }}</span>
         </p>
       </section>
 
@@ -146,24 +182,37 @@ const writing = computed(() => [
             All {{ repoCount }} repositories <span aria-hidden="true">&rarr;</span>
           </NuxtLink>
         </div>
+        <p class="section-note">
+          Listed first because, with no employer named above, these are the half of
+          this page you can actually check.
+        </p>
         <ul class="rows">
           <li v-for="(row, i) in work" :key="row.name" :style="{ '--i': i }">
-            <!-- NuxtLink resolves external hrefs to a plain anchor itself, so one
-                 element covers both the case study and the GitHub rows. -->
-            <NuxtLink
-              :to="row.href"
-              :target="isExternal(row.href) ? '_blank' : undefined"
-              :rel="isExternal(row.href) ? 'noopener' : undefined"
-              class="row row--link"
-            >
-              <span class="cell-title">{{ row.name }}</span>
+            <!-- Not one row-covering link any more: an <a> can't contain another
+                 <a>, and the tech cell now needs its own per-token links. Title
+                 and dest each link independently; TechList owns the tech cell. -->
+            <div class="row row--work">
+              <NuxtLink
+                :to="row.href"
+                :target="isExternal(row.href) ? '_blank' : undefined"
+                :rel="isExternal(row.href) ? 'noopener' : undefined"
+                class="cell-title"
+              >{{ row.name }}</NuxtLink>
               <span class="cell-note">{{ row.note }}</span>
-              <span class="cell-tech">{{ row.tech }}</span>
-              <span class="cell-dest">
+              <span class="cell-tech">
+                <TechList :items="row.tech" :href="row.href" />
+                <span v-if="row.meta" class="cell-meta">{{ row.meta }}</span>
+              </span>
+              <NuxtLink
+                :to="row.href"
+                :target="isExternal(row.href) ? '_blank' : undefined"
+                :rel="isExternal(row.href) ? 'noopener' : undefined"
+                class="cell-dest"
+              >
                 {{ row.dest }}
                 <span class="cell-arrow" aria-hidden="true">{{ isExternal(row.href) ? '↗' : '→' }}</span>
-              </span>
-            </NuxtLink>
+              </NuxtLink>
+            </div>
           </li>
         </ul>
       </section>
@@ -190,17 +239,6 @@ const writing = computed(() => [
         </ul>
       </section>
 
-      <!-- Stack -->
-      <section id="stack" class="section section--reveal" style="--s: 4">
-        <h2 class="section-label">Stack</h2>
-        <ul class="rows">
-          <li v-for="(row, i) in stack" :key="row.label" class="row row--stack" :style="{ '--i': i }">
-            <span class="cell-year">{{ row.label }}</span>
-            <span class="cell-title font-normal">{{ row.items }}</span>
-          </li>
-        </ul>
-      </section>
-
       <!-- Writing -->
       <!-- Only rendered once something is published: an empty section reads as
            abandoned, which is worse than not mentioning it at all. -->
@@ -208,7 +246,7 @@ const writing = computed(() => [
         v-if="writing.some((w) => w.n > 0)"
         id="writing"
         class="section section--reveal"
-        style="--s: 5"
+        style="--s: 4"
       >
         <h2 class="section-label">Writing</h2>
         <ul class="rows">
@@ -227,7 +265,7 @@ const writing = computed(() => [
       </section>
 
       <!-- Contact -->
-      <section id="contact" class="section section--reveal" style="--s: 6">
+      <section id="contact" class="section section--reveal" style="--s: 5">
         <h2 class="section-label">Contact</h2>
         <div class="contact-line flex flex-wrap items-baseline justify-between gap-x-8 gap-y-3 border-t border-line pt-4">
           <a
@@ -262,10 +300,27 @@ const writing = computed(() => [
 
 .lede {
   margin-top: 1.125rem;
-  max-width: 52ch;
+  /* Widened from 52ch: the throughline sentence added real length, and a
+     narrower measure was wrapping it into an unreadably tall paragraph. */
+  max-width: 58ch;
   font-size: 1.0625rem;
   line-height: 1.65;
   color: theme('colors.ink-muted');
+}
+
+/* The throughline links in the lede: same subtle-underline language as
+   TechList, since these are the same kind of thing — a claim with a project
+   behind it, not decoration. */
+.lede-link {
+  color: theme('colors.ink');
+  text-decoration: underline;
+  text-decoration-color: theme('colors.line-strong');
+  text-underline-offset: 2px;
+  transition: text-decoration-color 150ms ease;
+}
+
+.lede-link:hover {
+  text-decoration-color: theme('colors.ink-muted');
 }
 
 /* ---- Sections ------------------------------------------------------- */
@@ -311,9 +366,19 @@ const writing = computed(() => [
   margin-bottom: 0.75rem;
 }
 
+/* The page's first piece of "how I think" content that isn't buried in a
+   source comment — sits between the label and the rows it explains. */
+.section-note {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: theme('colors.ink-muted');
+  max-width: 48ch;
+  margin: -0.25rem 0 1rem;
+}
+
 /* ---- The listing --------------------------------------------------- */
-/* Experience, stack, work and writing all share one grid, so the page
-   reads as a single continuous listing rather than four stacked sections. */
+/* Experience, work and writing all share one grid, so the page reads as a
+   single continuous listing rather than stacked, unrelated sections. */
 
 .rows {
   border-top: 1px solid theme('colors.line');
@@ -328,10 +393,6 @@ const writing = computed(() => [
   border-bottom: 1px solid theme('colors.line');
 }
 
-.row--stack {
-  grid-template-columns: 5.5rem minmax(0, 1fr);
-}
-
 .row--link {
   /* The tech cell carries the actual evidence, so it gets enough room to read
      in full — an ellipsed stack line proves nothing. */
@@ -343,6 +404,35 @@ const writing = computed(() => [
 
 .row--link:hover {
   background-color: #f4f4f2;
+}
+
+/* Selected work: same shape as .row--link, but the row itself is a <div>, not
+   an anchor — title, tech tokens and dest are each their own link now, so a
+   full-row background tint would claim the whole row is one click target
+   when it isn't. Hover lives on the individual links instead. */
+.row--work {
+  grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.05fr) minmax(0, 0.78fr) auto;
+}
+
+.row--work .cell-title {
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: text-decoration-color 150ms ease;
+}
+
+.row--work .cell-title:hover {
+  text-decoration-color: theme('colors.line-strong');
+}
+
+.cell-meta {
+  margin-left: 0.5em;
+  color: theme('colors.ink-faint');
+}
+
+.cell-meta::before {
+  content: '·';
+  margin-right: 0.5em;
 }
 
 .cell-year {
@@ -404,13 +494,20 @@ const writing = computed(() => [
   color: theme('colors.ink');
 }
 
+/* .cell-dest is its own NuxtLink inside .row--work, so it hovers on itself
+   rather than waiting for a row-level hover that no longer exists there. */
+.cell-dest:hover {
+  color: theme('colors.ink');
+}
+
 .cell-arrow {
   justify-self: end;
   color: theme('colors.ink-faint');
   transition: transform 150ms ease, color 150ms ease;
 }
 
-.row--link:hover .cell-arrow {
+.row--link:hover .cell-arrow,
+.cell-dest:hover .cell-arrow {
   transform: translate(2px, 0);
   color: theme('colors.ink');
 }
@@ -463,12 +560,10 @@ const writing = computed(() => [
 
 @media (max-width: 640px) {
   .row,
-  .row--link {
+  .row--link,
+  .row--work {
     grid-template-columns: 1fr auto;
     gap: 0.15rem 1rem;
-  }
-  .row--stack {
-    grid-template-columns: 1fr;
   }
   .cell-year {
     grid-column: 1;
@@ -491,7 +586,8 @@ const writing = computed(() => [
   }
   /* On a work row the destination takes the top-right slot the CV gives to
      place, so the row still declares where it goes without the arrow drift. */
-  .row--link .cell-title {
+  .row--link .cell-title,
+  .row--work .cell-title {
     grid-column: 1;
   }
   .cell-dest {
@@ -510,6 +606,8 @@ const writing = computed(() => [
   .cell-arrow,
   .cell-dest,
   .row--link,
+  .row--work .cell-title,
+  .lede-link,
   .nav-link {
     transition: none;
   }
