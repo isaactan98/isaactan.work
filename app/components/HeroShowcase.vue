@@ -130,15 +130,6 @@ onUnmounted(() => {
     <ClientOnly>
       <component :is="sceneComponent" v-if="sceneComponent" class="hero-showcase-scene" />
     </ClientOnly>
-    <!-- Without JS the WebGL probe never runs, so the class that restores the
-         art on a wide viewport is never applied. This is the only way to put
-         it back for that reader; it is a plain global rule because scoped-
-         style rewriting does not reach inside noscript. -->
-    <noscript>
-      <style>
-        .hero-showcase-art { opacity: 1 !important; }
-      </style>
-    </noscript>
   </div>
 </template>
 
@@ -167,6 +158,28 @@ onUnmounted(() => {
   /* No WebGL, a failed chunk, or a connection slow enough that an empty slot
      has stopped being acceptable. */
   .hero-showcase.force-art .hero-showcase-art {
+    opacity: 1;
+  }
+}
+
+/* Without JS the WebGL probe never runs, so `force-art` is never applied and
+   the rule above would leave a wide viewport with an empty slot forever.
+   This puts the art back for that reader.
+ *
+ * A `<noscript><style>` inside the template was tried first and is not an
+ * option: Vue's client compiler rejects side-effecting tags in a component
+ * template outright ("Tags with side effect (<script> and <style>) are
+ * ignored in client component templates"). It slipped through review because
+ * the production build and the SSR markup both accepted it — only the dev
+ * server surfaces the error, so verifying the built output was verifying the
+ * wrong half.
+ *
+ * `scripting` has been Baseline since December 2023. A browser old enough not
+ * to know it drops this rule, which leaves it on the JS path — the right
+ * outcome, since a browser that predates this feature is overwhelmingly
+ * likely to be running JS anyway. */
+@media (scripting: none) {
+  .hero-showcase-art {
     opacity: 1;
   }
 }
