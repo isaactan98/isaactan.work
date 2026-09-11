@@ -149,22 +149,32 @@ const writing = computed(() => [
 <template>
   <main class="page-column pb-24">
       <!-- Hero -->
-      <section class="reveal pt-12 sm:pt-16" style="--d: 0ms">
-        <h1 class="hero">Three years of internal tools. Every layer, down to the server.</h1>
-        <p class="lede">
-          Full-stack engineer in Singapore, commuting from Johor Bahru. Enterprise
-          systems by day; by night, a home server running the tools I actually use
-          &mdash; architecture, build, deploy and maintenance, all mine. Most of what
-          follows exists because commuting, spending or deciding where to eat across
-          a border got annoying enough to fix &mdash;
-          <span v-for="t in throughline" :key="t.href">
-            <NuxtLink
-              :to="t.href"
-              :target="isExternal(t.href) ? '_blank' : undefined"
-              :rel="isExternal(t.href) ? 'noopener' : undefined"
-              class="lede-link"
-            >{{ t.name }}</NuxtLink>{{ t.after }}</span>
-        </p>
+      <!-- The one section PRODUCT.md's 2026-09-11 entry exempts from the
+           restraint principle everything else on this page follows. Text
+           first in DOM order on purpose: a mobile reader gets the real
+           content immediately, the showcase is the second thing they scroll
+           to, not a gate in front of the first. -->
+      <section class="hero-grid">
+        <div class="reveal" style="--d: 0ms">
+          <h1 class="hero">Three years of internal tools. Every layer, down to the server.</h1>
+          <p class="lede">
+            Full-stack engineer in Singapore, commuting from Johor Bahru. Enterprise
+            systems by day; by night, a home server running the tools I actually use
+            &mdash; architecture, build, deploy and maintenance, all mine. Most of what
+            follows exists because commuting, spending or deciding where to eat across
+            a border got annoying enough to fix &mdash;
+            <span v-for="t in throughline" :key="t.href">
+              <NuxtLink
+                :to="t.href"
+                :target="isExternal(t.href) ? '_blank' : undefined"
+                :rel="isExternal(t.href) ? 'noopener' : undefined"
+                class="lede-link"
+              >{{ t.name }}</NuxtLink>{{ t.after }}</span>
+          </p>
+        </div>
+        <div class="hero-showcase-slot reveal" style="--d: 60ms">
+          <HeroShowcase />
+        </div>
       </section>
 
       <section class="reveal mt-9" style="--d: 90ms">
@@ -287,6 +297,44 @@ const writing = computed(() => [
 /* ---- Hero ----------------------------------------------------------- */
 /* Plex Mono on paper reads "technical document", not "terminal". The
    headline is the only place it runs this large. */
+
+/* Text first in source order (see the template comment); on wide screens the
+   showcase sits beside it instead of below, so the two read as one hero
+   rather than a headline with an illustration bolted underneath. */
+.hero-grid {
+  padding-top: 3rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: center;
+  gap: 2.5rem;
+}
+
+@media (min-width: 640px) {
+  .hero-grid {
+    padding-top: 4rem;
+  }
+}
+
+@media (min-width: 900px) {
+  .hero-grid {
+    /* ~40/60 — the text stays the wider-feeling element even though the
+       showcase occupies more area, because it comes first and reads first. */
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: 2rem;
+  }
+}
+
+.hero-showcase-slot {
+  max-width: 26rem;
+  margin-inline: auto;
+}
+
+@media (min-width: 900px) {
+  .hero-showcase-slot {
+    max-width: none;
+    margin-inline: 0;
+  }
+}
 
 .hero {
   font-family: theme('fontFamily.mono');

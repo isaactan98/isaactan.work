@@ -54,8 +54,29 @@ swapped onto any other developer's name with zero changes, it's wrong for
 this page.
 
 Also not the opposite failure mode: no GitHub-heatmap flexing, no badge
-walls, no typewriter-effect taglines, no parallax hero. Restraint cuts both
-ways.
+walls, no typewriter-effect taglines. Restraint cuts both ways — with one
+named exception below.
+
+**2026-09-11 — the hero, and only the hero, is exempted from restraint.**
+Isaac explicitly asked for a 3D/GSAP hero after being told plainly that it
+contradicts this document's own anti-references (a "3D parallax hero" was
+named outright) and Design Principle 4 below, and after a cheaper,
+in-register alternative was offered and turned down. He chose visual impact
+on load over consistency with the rest of this file, in full knowledge of
+the tradeoff. That decision stands as of this date; overturning it back to
+"no exception" would be a second explicit decision, not a default this
+document reverts to on its own. This entry exists so nobody — including a
+future editor of this file — mistakes the exception for an oversight.
+
+The hero is still built to fit everything else here as much as a decorative
+3D scene can: same palette (ink/canvas/signal, no second brand color), a
+line-art/technical-blueprint treatment rather than an attempt at
+photorealism (which unlicensed procedural geometry can't deliver well
+anyway), and it degrades to a static equivalent under reduced motion, no
+WebGL, or a narrow viewport rather than demanding the exception be paid for
+everywhere. Everything below the hero — Selected Work, Experience, Writing,
+Contact — stays exactly as restrained as principles 1-5 describe. The
+exception is scoped to one section, not a license to decorate the page.
 
 ## Design Principles
 
@@ -73,16 +94,21 @@ ways.
    is a real asset, not a limitation to escape. Restructure what content goes
    where and how it's framed; don't introduce a second, incompatible visual
    language (e.g. a card grid) to solve this.
-4. **Restraint is not anonymity.** Personality is added through voice,
-   framing, and interaction (what a reader can click or poke at), never
-   through decoration, motion for its own sake, or breaking the one-accent
-   rule. If adding personality requires a second brand color, it's the wrong
-   kind of personality for this page.
+4. **Restraint is not anonymity — outside the hero.** Personality is added
+   through voice, framing, and interaction, never through decoration or a
+   second brand color, for every section this document governs except the
+   one named exception above. The exception doesn't loosen this principle
+   for anything else; if a future change wants to decorate a second section,
+   that's a new explicit decision to make and log here, not an inference
+   from this one.
 5. **Depth is layered, not forked.** The main page has to satisfy a
    30-second skim and reward a 5-minute read from the same content — deeper
    material expands in place or links onward (case studies, `/work`,
    `/freelance`), it doesn't require guessing which of three separate pages
-   to land on.
+   to land on. The hero's entrance plays once and gets out of the way; it
+   does not cost a mobile skimmer any real time before the actual content —
+   see Accessibility & Inclusion below for how that's enforced, not just
+   asserted.
 
 ## Accessibility & Inclusion
 
@@ -94,3 +120,13 @@ throttles observer callbacks and timers, which can leave content permanently
 invisible). Any new interactive or skills-showcase element must carry the same
 guarantee: fully readable and navigable with motion off, keyboard-operable,
 and never gated behind a JS callback that can silently fail to fire.
+
+The 3D hero is exempt from Design Principle 4, not from this section. It
+must still: render a static line-art equivalent (no WebGL context created at
+all) under `prefers-reduced-motion: reduce`, under WebGL feature-detection
+failure, and below a narrow-viewport threshold, so the users this document
+says matter most (mobile recruiters skimming in 30 seconds) never pay a
+network or parse cost for an effect they won't see animate; be `aria-hidden`
+so it adds nothing to a screen reader's pass over the page; and never delay
+or gate the real h1/lede text, which must be present and readable
+regardless of whether the 3D scene loads, fails, or is skipped.
