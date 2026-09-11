@@ -316,22 +316,36 @@ function buildLaptop(): THREE.Group {
   lid.position.y = LID_H / 2
   hinge.add(lid)
 
+  // Starts fully transparent and is faded up once the lid is open — a closed
+  // laptop showing a lit screen is the kind of detail that reads as wrong
+  // without the viewer being able to say why.
+  const displayMaterial = new THREE.MeshBasicMaterial({
+    map: screenTexture(),
+    transparent: true,
+    opacity: 0
+  })
   const display = new THREE.Mesh(
     new THREE.PlaneGeometry(BASE_W - 0.26, LID_H - 0.3),
-    new THREE.MeshBasicMaterial({ map: screenTexture() })
+    displayMaterial
   )
   display.position.set(0, LID_H / 2 + 0.02, 0.035)
   hinge.add(display)
 
+  const displayEdgeMaterial = new THREE.LineBasicMaterial({
+    color: INK,
+    transparent: true,
+    opacity: 0
+  })
   const displayEdge = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.PlaneGeometry(BASE_W - 0.26, LID_H - 0.3)),
-    new THREE.LineBasicMaterial({ color: INK })
+    displayEdgeMaterial
   )
   displayEdge.position.copy(display.position)
   displayEdge.position.z += 0.002
   hinge.add(displayEdge)
 
   laptop.userData.hinge = hinge
+  laptop.userData.screenMaterials = [displayMaterial, displayEdgeMaterial]
   return laptop
 }
 
@@ -623,9 +637,31 @@ onMounted(() => {
   // open laptop rests a little *past* vertical, reclined toward the viewer,
   // which is a small *negative* angle here — not the large negative sweep an
   // earlier version used, which read as the lid swinging almost flat.
-  const HINGE_CLOSED = Math.PI / 2 - 0.18
+  const HINGE_CLOSED = Math.PI / 2 - 0.07
   const HINGE_OPEN = -0.17
   const hinge = laptop.userData.hinge as THREE.Group
+  const screenMaterials = laptop.userData.screenMaterials as THREE.Material[]
+
+  /**
+   * Entrance beats, in seconds from the timeline start. Named rather than
+   * inlined as timeline offsets because the whole point of this sequence is
+   * the rhythm between them, and that rhythm is unreadable as a column of
+   * bare numbers in the third argument of each `.to()`.
+   *
+   * The laptop arrives closed, lands, and is allowed to sit for a beat before
+   * the lid moves — an object that starts opening while it is still flying
+   * into place reads as one blurred event, not as a thing arriving and then
+   * being opened. The screen lights up last, once the lid is most of the way
+   * up, so the sequence ends on the one green accent rather than on motion.
+   */
+  const LAPTOP_IN = 0
+  const LAPTOP_SETTLE = 1.05
+  const LAPTOP_SHADOW = 0.18
+  const CAMERA_IN = 0.45
+  const CAMERA_SHADOW = 0.7
+  const LID_OPEN = LAPTOP_SETTLE + 0.3 // the beat
+  const LID_DURATION = 1.1
+  const SCREEN_ON = LID_OPEN + LID_DURATION * 0.55
 
   // Capture the *actual* resting values set above rather than duplicating
   // them as separate literals here — two copies of the same number drift the
@@ -645,18 +681,19 @@ onMounted(() => {
   camShadow.material.opacity = 0
   rig.scale.setScalar(0.001) // avoid a one-frame flash of the resting pose
 
-  entranceTl = gsap.timeline({ delay: 0.15 })
+  entranceTl = gsap.timeline({ delay: 0.1 })
   entranceTl
     .to(rig.scale, { x: 1, y: 1, z: 1, duration: 0.01 })
-    .to(laptop.position, { y: laptopRestY, duration: 1.1, ease: 'siteReveal' }, 0)
-    .to(laptop.scale, { x: 1, y: 1, z: 1, duration: 1.1, ease: 'siteReveal' }, 0)
+    .to(laptop.position, { y: laptopRestY, duration: LAPTOP_SETTLE, ease: 'siteReveal' }, LAPTOP_IN)
+    .to(laptop.scale, { x: 1, y: 1, z: 1, duration: LAPTOP_SETTLE, ease: 'siteReveal' }, LAPTOP_IN)
     // Shadows fade in slightly behind their objects, so each one reads as
     // arriving on the surface rather than being painted there already.
-    .to(laptopShadow.material, { opacity: 0.85, duration: 0.9, ease: 'siteReveal' }, 0.25)
-    .to(hinge.rotation, { x: HINGE_OPEN, duration: 1.0, ease: 'siteReveal' }, 0.15)
-    .to(cam3d.position, { y: camRestY, duration: 1.05, ease: 'siteReveal' }, 0.25)
-    .to(cam3d.rotation, { y: camRestRotY, duration: 1.05, ease: 'siteReveal' }, 0.25)
-    .to(camShadow.material, { opacity: 0.8, duration: 0.9, ease: 'siteReveal' }, 0.5)
+    .to(laptopShadow.material, { opacity: 0.85, duration: 0.9, ease: 'siteReveal' }, LAPTOP_SHADOW)
+    .to(cam3d.position, { y: camRestY, duration: 1.0, ease: 'siteReveal' }, CAMERA_IN)
+    .to(cam3d.rotation, { y: camRestRotY, duration: 1.0, ease: 'siteReveal' }, CAMERA_IN)
+    .to(camShadow.material, { opacity: 0.8, duration: 0.9, ease: 'siteReveal' }, CAMERA_SHADOW)
+    .to(hinge.rotation, { x: HINGE_OPEN, duration: LID_DURATION, ease: 'siteReveal' }, LID_OPEN)
+    .to(screenMaterials, { opacity: 1, duration: 0.5, ease: 'power1.out' }, SCREEN_ON)
     .add(() => {
       // Idle: a slow sway, not a full turntable. A complete rotation was
       // tried and rejected — the laptop lid is a thin plane, and a full spin
@@ -714,9 +751,14 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* Fills whatever box HeroShowcase gives it rather than declaring its own
+   aspect ratio. The showcase lays this over the static line art, which is
+   what reserves the slot's height, so the two always occupy exactly the same
+   box and the crossfade between them doesn't move anything. `fitRig` derives
+   the frustum from the measured container, so any resulting shape is fine. */
 .hero-scene {
   width: 100%;
-  aspect-ratio: 5 / 3.4;
+  height: 100%;
 }
 
 .hero-scene :deep(canvas) {
