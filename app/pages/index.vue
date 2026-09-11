@@ -154,10 +154,12 @@ const writing = computed(() => [
            first in DOM order on purpose: a mobile reader gets the real
            content immediately, the showcase is the second thing they scroll
            to, not a gate in front of the first. -->
-      <section class="hero-grid">
-        <div class="reveal" style="--d: 0ms">
-          <h1 class="hero">Three years of internal tools. Every layer, down to the server.</h1>
-          <p class="lede">
+      <section class="hero-block">
+        <h1 class="hero reveal" style="--d: 0ms">
+          Three years of internal tools. Every layer, down to the server.
+        </h1>
+        <div class="hero-body">
+          <p class="lede reveal" style="--d: 40ms">
             Full-stack engineer in Singapore, commuting from Johor Bahru. Enterprise
             systems by day; by night, a home server running the tools I actually use
             &mdash; architecture, build, deploy and maintenance, all mine. Most of what
@@ -171,9 +173,9 @@ const writing = computed(() => [
                 class="lede-link"
               >{{ t.name }}</NuxtLink>{{ t.after }}</span>
           </p>
-        </div>
-        <div class="hero-showcase-slot reveal" style="--d: 60ms">
-          <HeroShowcase />
+          <div class="hero-showcase-slot reveal" style="--d: 80ms">
+            <HeroShowcase />
+          </div>
         </div>
       </section>
 
@@ -298,29 +300,44 @@ const writing = computed(() => [
 /* Plex Mono on paper reads "technical document", not "terminal". The
    headline is the only place it runs this large. */
 
-/* Text first in source order (see the template comment); on wide screens the
-   showcase sits beside it instead of below, so the two read as one hero
-   rather than a headline with an illustration bolted underneath. */
-.hero-grid {
+/* Headline spans the full column; the lede and the showcase share the row
+   beneath it.
+   The previous shape put the headline in a 2fr column beside a 3fr showcase,
+   which on a 1440px screen left it roughly 315px — about nine characters per
+   line of a 36px mono headline, wrapping "Three years of internal tools.
+   Every layer, down to the server." into five stacked fragments. That is the
+   whole of the "packed and uncomfortable" feeling: not too little whitespace,
+   but the largest type on the site fighting for the narrowest measure on the
+   page. Given the full column the same headline sits on two lines, and the
+   lede gets a ~43ch measure beside the showcase instead of a ~37ch one under
+   a squeezed title. */
+.hero-block {
   padding-top: 3rem;
-  display: grid;
-  grid-template-columns: 1fr;
-  align-items: center;
-  gap: 2.5rem;
 }
 
 @media (min-width: 640px) {
-  .hero-grid {
-    padding-top: 4rem;
+  .hero-block {
+    padding-top: 4.5rem;
   }
 }
 
+.hero-body {
+  margin-top: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
 @media (min-width: 900px) {
-  .hero-grid {
-    /* ~40/60 — the text stays the wider-feeling element even though the
-       showcase occupies more area, because it comes first and reads first. */
-    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-    gap: 2rem;
+  .hero-body {
+    margin-top: 2.25rem;
+    /* Showcase a shade wider than the lede: at an even split the lede sat at
+       a comfortable 43ch while the scene had barely 360px to render a laptop
+       and a camera in. This keeps the lede above 40ch and buys the scene back
+       ~40px. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
+    gap: 2.75rem;
   }
 }
 
@@ -340,16 +357,17 @@ const writing = computed(() => [
   font-family: theme('fontFamily.mono');
   font-size: clamp(1.375rem, 3.2vw, 2.25rem);
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.22;
   letter-spacing: -0.02em;
   text-wrap: balance;
-  max-width: 28ch;
+  /* Two comfortable lines at the capped 36px size, rather than the 28ch that
+     the old narrow column never got anywhere near using. */
+  max-width: 32ch;
 }
 
 .lede {
-  margin-top: 1.125rem;
-  /* Widened from 52ch: the throughline sentence added real length, and a
-     narrower measure was wrapping it into an unreadably tall paragraph. */
+  /* No top margin any more: the headline is a sibling above the grid, and the
+     grid's own gap handles the separation. */
   max-width: 58ch;
   font-size: 1.0625rem;
   line-height: 1.65;
