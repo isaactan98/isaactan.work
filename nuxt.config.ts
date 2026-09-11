@@ -62,5 +62,35 @@ export default defineNuxtConfig({
         }
       }
     }
+  },
+
+  hooks: {
+    /**
+     * Nuxt injects a <link rel="prefetch"> for every async-loaded chunk
+     * reachable from a page, independent of Vite's own `modulePreload`
+     * mechanism (confirmed: setting `vite.build.modulePreload.
+     * resolveDependencies` to strip everything had zero effect on these
+     * specific links — they come from Nuxt's own manifest-prefetch step,
+     * not Vite's). HeroShowcase.vue's `import('./HeroScene3D.vue')` is
+     * written as an imperative call inside a feature-detection check
+     * specifically so mobile, reduced-motion and no-WebGL visitors never
+     * fetch the three.js+gsap bundle behind it — Nuxt's build-time manifest
+     * step can't see that runtime condition, so without this hook every
+     * visitor downloaded it regardless of whether the scene ever renders.
+     *
+     * Matched by the manifest's source-path key (contains "HeroScene3D"),
+     * not the hashed output filename, which changes every build. Scoped to
+     * that one entry rather than disabling prefetch globally — the same
+     * mechanism legitimately speeds up navigation to /work, /freelance and
+     * the writing indexes, and there is no reason to give that up here.
+     */
+    'build:manifest': (manifest) => {
+      for (const [key, chunk] of Object.entries(manifest)) {
+        if (key.includes('HeroScene3D')) {
+          chunk.prefetch = false
+          chunk.preload = false
+        }
+      }
+    }
   }
 })
