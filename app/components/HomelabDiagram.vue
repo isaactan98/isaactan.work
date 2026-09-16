@@ -347,8 +347,11 @@ function send() {
   font-size: 11.5px;
   fill: theme('colors.ink-muted');
 }
+/* 11px, not 10: Apple's iOS minimum type size is 11pt
+   (`accessibility.md › Vision`), and points there are density-independent,
+   so they map 1:1 onto CSS pixels. */
 .cap {
-  font-size: 10px;
+  font-size: 11px;
   fill: theme('colors.ink-faint');
   letter-spacing: 0.08em;
 }

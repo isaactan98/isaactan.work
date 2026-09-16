@@ -93,6 +93,13 @@ const nav = [
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: theme('colors.ink-muted');
+  /* Claws back most of the vertical padding the links below need for a 44px
+     hit area, so widening the target doesn't push the header down by 26px on
+     a phone — the scarcest space on the site. The header still grows ~10px,
+     which is the honest cost. What's left of the header's `gap-y-3` keeps a
+     4px gap between the brand link's box and the nav links' boxes, so the two
+     rows' hit areas never overlap and steal each other's taps. */
+  margin-block: -0.5rem;
 }
 
 @media (min-width: 640px) {
@@ -104,6 +111,15 @@ const nav = [
 .nav-link {
   position: relative;
   transition: color 150ms ease;
+  /* 11px uppercase text gives an 18px line box; these pads take the tappable
+     height to 44px. Apple's floor is 28x28pt and its default is 44x44
+     (`accessibility.md › Mobility`), and this is the site's primary
+     navigation on a phone, so it gets the default rather than the floor.
+     Horizontal padding is deliberately not added: the 1.25rem flex gap is the
+     only separation between adjacent links, and eating it would put two
+     targets edge to edge. */
+  --nav-pad-y: 0.8125rem;
+  padding-block: var(--nav-pad-y);
 }
 
 .nav-link:hover {
@@ -116,7 +132,9 @@ const nav = [
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -4px;
+  /* Measured from inside the padding, so the rule stays 4px under the text
+     rather than 4px under the enlarged hit area. */
+  bottom: calc(var(--nav-pad-y) - 4px);
   height: 1px;
   background: theme('colors.ink');
   transform: scaleX(0);

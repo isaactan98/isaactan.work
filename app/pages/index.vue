@@ -190,7 +190,7 @@ const writing = computed(() => [
       <section id="work" class="section section--first section--reveal" style="--s: 2">
         <div class="section-head">
           <h2 class="section-label">Selected work</h2>
-          <NuxtLink to="/work" class="section-more">
+          <NuxtLink to="/work" class="section-more tap-44">
             All {{ repoCount }} repositories <span aria-hidden="true">&rarr;</span>
           </NuxtLink>
         </div>
