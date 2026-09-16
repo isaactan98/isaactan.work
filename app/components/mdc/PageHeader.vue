@@ -21,7 +21,7 @@ const coverFailed = ref(false)
   <header data-notion-block class="not-prose page-header" :class="{ 'has-cover': cover }">
     <div
       v-if="cover"
-      class="full-bleed relative h-[30vh] min-h-[180px] overflow-hidden bg-gradient-to-br from-[#e3e8ef] via-[#eceef2] to-[#dfe4ec]"
+      class="full-bleed relative h-[30vh] min-h-[180px] overflow-hidden bg-gradient-to-br from-[#e3e8ef] via-[#eceef2] to-[#dfe4ec] dark:from-[#1f2630] dark:via-[#232a33] dark:to-[#1b212a]"
     >
       <img
         v-show="!coverFailed"

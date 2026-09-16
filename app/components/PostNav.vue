@@ -123,7 +123,7 @@ const older = computed(() =>
 
 .post-nav-link:hover {
   border-color: theme('colors.line-strong');
-  background: #f4f4f2;
+  background: theme('colors.hover');
   transform: translateY(-1px);
 }
 

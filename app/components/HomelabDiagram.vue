@@ -309,11 +309,11 @@ function send() {
      overflows and hides again at the end of the scroll. Pairs with the
      "scroll →" hint in the readout — one cue is textual, one is spatial. */
   background:
-    linear-gradient(to right, #ffffff 40%, rgba(255, 255, 255, 0)) left center / 36px 100% no-repeat local,
-    linear-gradient(to left, #ffffff 40%, rgba(255, 255, 255, 0)) right center / 36px 100% no-repeat local,
-    radial-gradient(farthest-side at 0 50%, rgba(55, 53, 47, 0.09), rgba(55, 53, 47, 0)) left center / 12px 100% no-repeat scroll,
-    radial-gradient(farthest-side at 100% 50%, rgba(55, 53, 47, 0.09), rgba(55, 53, 47, 0)) right center / 12px 100% no-repeat scroll,
-    #ffffff;
+    linear-gradient(to right, theme('colors.surface') 40%, var(--c-surface-fade)) left center / 36px 100% no-repeat local,
+    linear-gradient(to left, theme('colors.surface') 40%, var(--c-surface-fade)) right center / 36px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--c-edge-shadow), transparent) left center / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--c-edge-shadow), transparent) right center / 12px 100% no-repeat scroll,
+    theme('colors.surface');
 }
 
 .diagram-svg {

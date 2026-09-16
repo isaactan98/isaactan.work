@@ -230,7 +230,7 @@ const isExternal = (href: string) => href.startsWith('http')
 }
 
 .row--link:hover {
-  background-color: #f4f4f2;
+  background-color: theme('colors.hover');
 }
 
 .cell-year {
