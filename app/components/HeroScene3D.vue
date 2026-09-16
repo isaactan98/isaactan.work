@@ -31,22 +31,87 @@ gsap.registerPlugin(CustomEase)
 // generic GSAP default.
 CustomEase.create('siteReveal', '0.16, 1, 0.3, 1')
 
-const CANVAS = 0xfbfbfa
-const SURFACE = 0xffffff
-const INK = 0x37352f
-const INK_FAINT = 0x9b9a97
-const LINE_STRONG = 0xdfdfdd
-const SIGNAL = 0x4a8f5b
-
 /**
- * Face tone sits a little below the page's canvas colour, because the lights
- * multiply it up: a surface that starts at the background colour has nowhere
- * to go but blown-out. Chosen together with the light intensities in
- * `onMounted` so an up-facing surface lands around 0.89 in display space —
- * pale, clearly lighter than the sides, and still short of clipping.
+ * The scene's palette, rebuilt from the page's own custom properties whenever
+ * the appearance changes.
+ *
+ * A WebGL context can't use `theme()` or a CSS variable directly, so these are
+ * read out of the document with `getComputedStyle` and handed to three.js as
+ * colours. That keeps the one palette in app/assets/css/tailwind.css
+ * authoritative for the canvas too, instead of a second copy drifting in here
+ * — which is exactly what the previous version of this file warned about and
+ * could not avoid.
+ *
+ * `signal` is taken straight from the page. The face and edge tones are not:
+ * they are scene-specific, because they exist to be multiplied by the lights
+ * below rather than displayed as written, so they are derived here where the
+ * lighting math also lives.
  */
-const FACE = 0xf7f7f5
-const FACE_DARK = 0xe6e6e3
+type ScenePalette = ReturnType<typeof readPalette>
+
+function readPalette(dark: boolean) {
+  const cs = getComputedStyle(document.documentElement)
+  const token = (name: string) => new THREE.Color(cs.getPropertyValue(name).trim() || '#000000')
+
+  return {
+    dark,
+    signal: token('--c-signal'),
+
+    /**
+     * Face tone sits where the lights can bring it to the intended value, not
+     * at the intended value itself.
+     *
+     * Light: #f7f7f5 lands an up-facing surface at #e2e2e0, a shade under the
+     * page so the object reads as sitting *on* paper. Any lighter and the top
+     * faces clip to flat white and the geometry loses its form.
+     *
+     * Dark: #5a5a56 lands the same surface at #52524e — 2.24:1 against the
+     * #191918 canvas, where light mode only needs 1.25:1. A dark ground gives
+     * an object nothing to catch, so it has to lift further off the page to
+     * read at all; matching light mode's separation here would leave the
+     * laptop as a barely-visible smudge.
+     */
+    face: new THREE.Color(dark ? '#5a5a56' : '#f7f7f5'),
+    faceDark: new THREE.Color(dark ? '#484844' : '#e6e6e3'),
+
+    /**
+     * Edge lines invert with the appearance: ink on pale faces in light, a
+     * light line on dark faces in dark. Dark uses the page's own ink-muted
+     * rather than ink — full ink against these faces reads as a neon
+     * wireframe, where ink-muted lands at 3.2:1 on the top faces and 4.0:1 on
+     * the sides: clearly drawn, still a drawing.
+     */
+    edge: dark ? token('--c-ink-muted') : token('--c-ink'),
+
+    /** The lens's front element. Near-black in both, since glass is glass. */
+    glass: new THREE.Color(dark ? '#141413' : '#2c2b27'),
+
+    screen: {
+      bg: dark ? '#1c1c1b' : '#ffffff',
+      chrome: dark ? '#242423' : '#f4f4f2',
+      dot: dark ? '#3a3a37' : '#dfdfdd',
+      sidebar: dark ? '#191918' : '#fbfbfa',
+      sidebarLine: dark ? '#2e2e2b' : '#e9e9e7',
+      codeLine: dark ? '#35352f' : '#e3e3e0',
+      accent: cs.getPropertyValue('--c-signal').trim() || '#4a8f5b'
+    },
+
+    keyboard: {
+      deck: dark ? '#3d3d3a' : '#f2f2f0',
+      key: dark ? '#2a2a28' : '#dcdcd9'
+    },
+
+    /**
+     * Contact shadow. #191918 is not pure black, so a black pool still reads
+     * against it — but only just, which is why dark runs at roughly twice the
+     * alpha of light.
+     */
+    shadow: dark ? '0,0,0' : '55,53,47',
+    shadowAlpha: dark ? 1.9 : 1
+  }
+}
+
+let palette: ScenePalette
 
 /**
  * EdgesGeometry only emits an edge where the angle between the two faces
@@ -97,14 +162,14 @@ let fitHalfHeight = 1
  */
 function edged(
   geometry: THREE.BufferGeometry,
-  color = FACE,
+  color?: THREE.Color,
   threshold = 1
 ): THREE.Group {
   const group = new THREE.Group()
   const mesh = new THREE.Mesh(
     geometry,
     new THREE.MeshLambertMaterial({
-      color,
+      color: color ?? palette.face,
       polygonOffset: true,
       polygonOffsetFactor: 1,
       polygonOffsetUnits: 1
@@ -112,14 +177,14 @@ function edged(
   )
   const edges = new THREE.LineSegments(
     new THREE.EdgesGeometry(geometry, threshold),
-    new THREE.LineBasicMaterial({ color: INK })
+    new THREE.LineBasicMaterial({ color: palette.edge })
   )
   group.add(mesh, edges)
   return group
 }
 
 /** An unlit detail chip — status bars, indicator dots, screen furniture. */
-function flat(geometry: THREE.BufferGeometry, color: number): THREE.Mesh {
+function flat(geometry: THREE.BufferGeometry, color: THREE.Color): THREE.Mesh {
   return new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color }))
 }
 
@@ -141,9 +206,10 @@ function shadowSprite(width: number, depth: number, opacity: number): ShadowMesh
     canvas.width = canvas.height = size
     const ctx = canvas.getContext('2d')!
     const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-    gradient.addColorStop(0, 'rgba(55,53,47,0.55)')
-    gradient.addColorStop(0.45, 'rgba(55,53,47,0.22)')
-    gradient.addColorStop(1, 'rgba(55,53,47,0)')
+    const { shadow: rgb, shadowAlpha: a } = palette
+    gradient.addColorStop(0, `rgba(${rgb},${Math.min(1, 0.55 * a)})`)
+    gradient.addColorStop(0.45, `rgba(${rgb},${Math.min(1, 0.22 * a)})`)
+    gradient.addColorStop(1, `rgba(${rgb},0)`)
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, size, size)
     shadowTexture = new THREE.CanvasTexture(canvas)
@@ -174,14 +240,15 @@ function screenTexture(): THREE.CanvasTexture {
   canvas.height = h
   const ctx = canvas.getContext('2d')!
 
-  ctx.fillStyle = '#ffffff'
+  const sc = palette.screen
+  ctx.fillStyle = sc.bg
   ctx.fillRect(0, 0, w, h)
 
   // Title bar with the three window dots — one glyph everyone reads as
   // "a real window" without needing to resolve any text.
-  ctx.fillStyle = '#f4f4f2'
+  ctx.fillStyle = sc.chrome
   ctx.fillRect(0, 0, w, 28)
-  ctx.fillStyle = '#dfdfdd'
+  ctx.fillStyle = sc.dot
   for (let i = 0; i < 3; i++) {
     ctx.beginPath()
     ctx.arc(20 + i * 18, 14, 5, 0, Math.PI * 2)
@@ -189,22 +256,22 @@ function screenTexture(): THREE.CanvasTexture {
   }
 
   // Sidebar
-  ctx.fillStyle = '#fbfbfa'
+  ctx.fillStyle = sc.sidebar
   ctx.fillRect(0, 28, 104, h - 28)
-  ctx.fillStyle = '#e9e9e7'
+  ctx.fillStyle = sc.sidebarLine
   for (let i = 0; i < 7; i++) ctx.fillRect(16, 50 + i * 26, 60 - (i % 3) * 12, 6)
 
   // Code lines: indentation varied so it scans as code, not as a paragraph.
   const indents = [0, 0, 1, 2, 2, 1, 0, 1, 2, 3, 2, 1]
   const widths = [180, 240, 150, 210, 120, 260, 90, 200, 160, 130, 220, 100]
-  ctx.fillStyle = '#e3e3e0'
+  ctx.fillStyle = sc.codeLine
   indents.forEach((indent, i) => {
     ctx.fillRect(128 + indent * 18, 52 + i * 22, widths[i]!, 7)
   })
 
   // The site's one accent, doing the same job it does everywhere else on the
   // page: marking something as running.
-  ctx.fillStyle = '#4a8f5b'
+  ctx.fillStyle = sc.accent
   ctx.fillRect(128, 52 + 5 * 22, 150, 7)
 
   const texture = new THREE.CanvasTexture(canvas)
@@ -227,7 +294,7 @@ function keyboardTexture(): THREE.CanvasTexture {
   canvas.height = h
   const ctx = canvas.getContext('2d')!
 
-  ctx.fillStyle = '#f2f2f0'
+  ctx.fillStyle = palette.keyboard.deck
   ctx.fillRect(0, 0, w, h)
 
   // `roundRect` is recent enough (Safari 16, Firefox 112) that a visitor on an
@@ -241,7 +308,7 @@ function keyboardTexture(): THREE.CanvasTexture {
     ctx.fill()
   }
 
-  ctx.fillStyle = '#dcdcd9'
+  ctx.fillStyle = palette.keyboard.key
   const rows = [
     { y: 16, h: 16, count: 14 },
     { y: 40, h: 24, count: 14 },
@@ -291,7 +358,7 @@ function buildLaptop(): THREE.Group {
 
   const trackpad = new THREE.Mesh(
     new THREE.PlaneGeometry(1.0, 0.66),
-    new THREE.MeshLambertMaterial({ color: 0xf5f5f3 })
+    new THREE.MeshLambertMaterial({ color: palette.faceDark })
   )
   trackpad.rotation.x = -Math.PI / 2
   trackpad.position.set(0, BASE_H + 0.002, 0.58)
@@ -299,7 +366,7 @@ function buildLaptop(): THREE.Group {
 
   const trackpadEdge = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.PlaneGeometry(1.0, 0.66)),
-    new THREE.LineBasicMaterial({ color: LINE_STRONG })
+    new THREE.LineBasicMaterial({ color: palette.edge })
   )
   trackpadEdge.rotation.x = -Math.PI / 2
   trackpadEdge.position.set(0, BASE_H + 0.004, 0.58)
@@ -332,7 +399,7 @@ function buildLaptop(): THREE.Group {
   hinge.add(display)
 
   const displayEdgeMaterial = new THREE.LineBasicMaterial({
-    color: INK,
+    color: palette.edge,
     transparent: true,
     opacity: 0
   })
@@ -381,28 +448,28 @@ function buildCamera(): THREE.Group {
     curveSegments: 8
   })
   bodyGeo.translate(0, 0, -DEPTH / 2)
-  cam.add(edged(bodyGeo, FACE, ROUND_EDGE_THRESHOLD))
+  cam.add(edged(bodyGeo, palette.face, ROUND_EDGE_THRESHOLD))
 
   // Electronic viewfinder hump: a 4-sided tapered cylinder gives a real
   // pentaprism taper in one geometry, and its four faces are 90° apart so the
   // default edge threshold outlines it cleanly.
   const evf = edged(
     new THREE.CylinderGeometry(0.28, 0.36, 0.26, 4).rotateY(Math.PI / 4),
-    FACE
+    palette.face
   )
   evf.scale.set(1, 1, 1.4)
   evf.position.set(-0.3, 0.62, 0)
   cam.add(evf)
 
   // Hot shoe
-  const shoe = edged(new THREE.BoxGeometry(0.3, 0.05, 0.26), FACE_DARK)
+  const shoe = edged(new THREE.BoxGeometry(0.3, 0.05, 0.26), palette.faceDark)
   shoe.position.set(-0.3, 0.77, 0)
   cam.add(shoe)
 
   // Mode dial
   const dial = edged(
     new THREE.CylinderGeometry(0.21, 0.21, 0.12, 28),
-    FACE_DARK,
+    palette.faceDark,
     ROUND_EDGE_THRESHOLD
   )
   dial.position.set(0.72, 0.56, -0.02)
@@ -412,7 +479,7 @@ function buildCamera(): THREE.Group {
   // a real body — flat on top reads as a button glued on.
   const shutter = edged(
     new THREE.CylinderGeometry(0.11, 0.11, 0.07, 24),
-    FACE_DARK,
+    palette.faceDark,
     ROUND_EDGE_THRESHOLD
   )
   shutter.position.set(1.19, 0.44, 0.08)
@@ -448,7 +515,7 @@ function buildCamera(): THREE.Group {
       profile.map(([r, y]) => new THREE.Vector2(r, y)),
       36
     ).rotateX(Math.PI / 2),
-    FACE,
+    palette.face,
     ROUND_EDGE_THRESHOLD
   )
   lens.position.set(-0.3, -0.02, 0.62)
@@ -458,7 +525,7 @@ function buildCamera(): THREE.Group {
   // catches the light differently from the barrel around it.
   const glass = new THREE.Mesh(
     new THREE.SphereGeometry(0.5, 24, 12, 0, Math.PI * 2, 0, 0.68),
-    new THREE.MeshLambertMaterial({ color: 0x2c2b27 })
+    new THREE.MeshLambertMaterial({ color: palette.glass })
   )
   // +Y is the sphere cap's pole; rotating +90° about X maps it onto +Z so the
   // dome faces out of the lens rather than back into the body.
@@ -467,17 +534,17 @@ function buildCamera(): THREE.Group {
   cam.add(glass)
 
   // Rear thumb rest / control cluster, read from behind as the body turns.
-  const thumbRest = edged(new THREE.BoxGeometry(0.26, 0.3, 0.06), FACE_DARK)
+  const thumbRest = edged(new THREE.BoxGeometry(0.26, 0.3, 0.06), palette.faceDark)
   thumbRest.position.set(0.82, 0.05, -DEPTH / 2 - 0.02)
   cam.add(thumbRest)
 
   // Record indicator — the same accent as the laptop's status bar, the
   // diagram's live dots, and nothing else on the page.
-  const indicator = flat(new THREE.CircleGeometry(0.06, 16), SIGNAL)
+  const indicator = flat(new THREE.CircleGeometry(0.06, 16), palette.signal)
   indicator.position.set(0.35, 0.3, DEPTH / 2 + 0.002)
   cam.add(indicator)
 
-  const brandBar = flat(new THREE.PlaneGeometry(0.34, 0.05), INK_FAINT)
+  const brandBar = flat(new THREE.PlaneGeometry(0.34, 0.05), palette.edge)
   brandBar.position.set(0.42, -0.28, DEPTH / 2 + 0.002)
   cam.add(brandBar)
 
@@ -560,7 +627,18 @@ function resize() {
   renderer.setSize(w, h)
 }
 
-onMounted(() => {
+/**
+ * Builds the whole scene. Split out of `onMounted` so a change of appearance
+ * can tear down and rebuild rather than trying to patch colours in place:
+ * every material, both canvas textures and the hemisphere light's ground
+ * colour are palette-derived, so a partial update would need a registry of
+ * every one of them and would silently miss whichever was added next. The
+ * geometry is procedural and rebuilding it costs a few milliseconds.
+ *
+ * `animate: false` is for that rebuild — a laptop that re-opens itself
+ * because the sun went down is a surprise, not a delight.
+ */
+function build(animate: boolean) {
   if (!root.value) return
 
   scene = new THREE.Scene()
@@ -582,11 +660,16 @@ onMounted(() => {
   // clipped every top face to identical flat white and undid the whole reason
   // for lighting the scene. These land roughly top 0.89 / front 0.83 /
   // side 0.77 in display space: visible form, nothing clipped.
-  scene.add(new THREE.HemisphereLight(SURFACE, LINE_STRONG, 1.4))
-  const key = new THREE.DirectionalLight(SURFACE, 1.3)
+  // White lights in both appearances: the darkness of the dark scene comes
+  // from the face tones being darker, not from dimming the lights. Tinting or
+  // dimming them instead would desaturate the one signal-green accent, which
+  // has to keep meaning "running" in both.
+  const WHITE = 0xffffff
+  scene.add(new THREE.HemisphereLight(WHITE, palette.faceDark.getHex(), 1.4))
+  const key = new THREE.DirectionalLight(WHITE, 1.3)
   key.position.set(3, 6, 5)
   scene.add(key)
-  const fill = new THREE.DirectionalLight(SURFACE, 0.4)
+  const fill = new THREE.DirectionalLight(WHITE, 0.4)
   fill.position.set(-5, 2, -3)
   scene.add(fill)
 
@@ -711,13 +794,19 @@ onMounted(() => {
       })
     })
 
+  // A rebuild wants the scene the entrance *arrives* at, not the pose it
+  // starts from. Seeking to the end applies every final value and fires the
+  // callback that starts the idle sway, so the rebuilt scene is identical to
+  // one that animated — it just didn't perform.
+  if (!animate) entranceTl.progress(1)
+
   tickerFn = () => {
     if (renderer && scene && camera) renderer.render(scene, camera)
   }
   gsap.ticker.add(tickerFn)
-})
+}
 
-onUnmounted(() => {
+function teardown() {
   if (tickerFn) gsap.ticker.remove(tickerFn)
   entranceTl?.kill()
   idleTween?.kill()
@@ -743,6 +832,39 @@ onUnmounted(() => {
   renderer = null
   scene = null
   camera = null
+  tickerFn = null
+  entranceTl = null
+  idleTween = null
+  resizeObserver = null
+}
+
+/**
+ * The appearance can change while the page is open — `dark-mode.md › Best
+ * practices` calls this out directly: "people can choose the Auto appearance
+ * setting, which switches between the light and dark appearances as
+ * conditions change throughout the day, potentially while your app is
+ * running." A canvas can't inherit that the way the CSS does, so it has to be
+ * told.
+ */
+let appearance: MediaQueryList | null = null
+
+function onAppearanceChange(event: MediaQueryListEvent) {
+  palette = readPalette(event.matches)
+  teardown()
+  build(false)
+}
+
+onMounted(() => {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)')
+  appearance = mq
+  palette = readPalette(mq.matches)
+  build(true)
+  mq.addEventListener('change', onAppearanceChange)
+})
+
+onUnmounted(() => {
+  appearance?.removeEventListener('change', onAppearanceChange)
+  teardown()
 })
 </script>
 

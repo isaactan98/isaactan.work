@@ -374,7 +374,7 @@ const year = (d: string) => d.slice(0, 4)
 }
 
 .case-head:hover {
-  background-color: #f4f4f2;
+  background-color: theme('colors.hover');
 }
 
 .case-chevron svg {
@@ -610,7 +610,7 @@ const year = (d: string) => d.slice(0, 4)
 }
 
 .row--link:hover {
-  background-color: #f4f4f2;
+  background-color: theme('colors.hover');
 }
 
 .cell-title {

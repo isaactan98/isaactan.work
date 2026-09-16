@@ -374,7 +374,7 @@ function reset() {
 }
 
 .row--link:hover {
-  background-color: #f4f4f2;
+  background-color: theme('colors.hover');
 }
 
 .cell-date {

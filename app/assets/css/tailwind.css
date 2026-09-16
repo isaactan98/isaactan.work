@@ -3,6 +3,111 @@
 @tailwind utilities;
 
 @layer base {
+  /**
+   * The palette lives here as custom properties, and tailwind.config.ts points
+   * every colour token at one of them. That indirection is what makes dark
+   * mode possible at all: `theme('colors.ink')` is resolved by Tailwind at
+   * build time and compiles to a literal hex, so the ~190 `theme()` calls in
+   * this project's scoped styles could never have adapted to an appearance
+   * chosen at runtime. Pointed at a variable instead, every one of them
+   * becomes appearance-aware without a single component being touched.
+   *
+   * There is deliberately no in-app appearance toggle. `dark-mode.md › Best
+   * practices`: "Avoid offering an app-specific appearance setting. An
+   * app-specific appearance mode option creates more work for people because
+   * they have to adjust more than one setting to get the appearance they
+   * want." The system setting is the only input.
+   */
+  :root {
+    color-scheme: light dark;
+
+    --c-canvas: #fbfbfa;
+    --c-surface: #ffffff;
+    /* Row and card hover. Was hardcoded as #f4f4f2 in six separate files. */
+    --c-hover: #f4f4f2;
+
+    --c-ink: #37352f;
+    --c-ink-muted: #5c5b57;
+    --c-ink-faint: #747471;
+
+    --c-line: #e9e9e7;
+    --c-line-strong: #dfdfdd;
+
+    --c-signal: #4a8f5b;
+
+    --c-callout: #f1f1ef;
+    --c-callout-info: #e7f3f8;
+    --c-callout-warning: #fbf3db;
+    --c-callout-success: #edf3ec;
+
+    --c-code-bg: #f4f3f1;
+    --c-code-text: #be4646;
+
+    --c-selection: #d3e5f5;
+
+    /* Gradient stops for HomelabDiagram's horizontal-overflow cue. A gradient
+       has to fade to a *transparent version of its own colour*, which no solid
+       token can express, so these two carry the alpha themselves. */
+    --c-surface-fade: rgba(255, 255, 255, 0);
+    --c-edge-shadow: rgba(55, 53, 47, 0.09);
+  }
+
+  /**
+   * Dark values are a port of the light ladder, not an inversion of its hexes
+   * — `dark-mode.md › Dark Mode colors`: "these colors aren't necessarily
+   * inversions of their light counterparts". Each text tier was solved to land
+   * on the same contrast ratio its light counterpart has, measured against
+   * --c-surface, which is the lighter of the two grounds in dark mode and so
+   * the binding case:
+   *
+   *            on surface   on canvas   (light mode was)
+   *   ink        12.08:1     13.19:1     11.84:1
+   *   ink-muted   6.61:1      7.22:1      6.57:1
+   *   ink-faint   4.61:1      5.03:1      4.53:1
+   *
+   * Tier separation comes out at 1.83:1 then 1.43:1, against 1.80 and 1.45 in
+   * light — so the hierarchy reads identically in both appearances rather than
+   * quietly flattening in one of them.
+   *
+   * Surface stays *lighter* than canvas in both appearances, so "raised" means
+   * the same thing either way and cards don't invert their relationship to the
+   * page.
+   */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --c-canvas: #191918;
+      --c-surface: #212120;
+      --c-hover: #2a2a28;
+
+      --c-ink: #dfdfde;
+      --c-ink-muted: #a6a6a4;
+      --c-ink-faint: #8a8987;
+
+      --c-line: #2c2c2a;
+      --c-line-strong: #383734;
+
+      /* Lifted from the light #4a8f5b, which is far too dark to read as "on"
+         against #191918. At 5.54:1 on surface it clears AA as text while
+         staying an accent rather than a highlighter. */
+      --c-signal: #57a86b;
+
+      --c-callout: #232322;
+      --c-callout-info: #1b2a33;
+      --c-callout-warning: #2e2717;
+      --c-callout-success: #1d2a20;
+
+      --c-code-bg: #242423;
+      --c-code-text: #e8837f;
+
+      --c-selection: #2c4257;
+
+      /* Matches --c-surface above. A dark-on-dark scroll shadow has almost no
+         room to read, so it goes considerably heavier than the light one. */
+      --c-surface-fade: rgba(33, 33, 32, 0);
+      --c-edge-shadow: rgba(0, 0, 0, 0.45);
+    }
+  }
+
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -17,7 +122,39 @@
   }
 
   ::selection {
-    background-color: #d3e5f5;
+    background-color: var(--c-selection);
+  }
+
+  /**
+   * Shiki is configured with two themes in nuxt.config.ts (github-light and
+   * github-dark). Nuxt Content emits every token's colours as a pair of custom
+   * properties and then ships its own switch:
+   *
+   *   html .shiki span       { color: var(--shiki-default) }
+   *   html .dark .shiki span { color: var(--shiki-dark) }
+   *
+   * That switch is keyed off a `.dark` class on an ancestor, which this site
+   * never sets — the appearance here follows `prefers-color-scheme` and there
+   * is no class to toggle. Without the rule below, a dark page would render
+   * github-light syntax colours on a near-black code panel.
+   *
+   * `!important` rather than a heavier selector because Nuxt Content injects
+   * that stylesheet into the document itself: its position relative to this
+   * file is not something this file can rely on, and at equal specificity
+   * source order would decide. Confirmed against the built output rather than
+   * assumed — an earlier version of this rule targeted an inline
+   * `--shiki-dark` per span, which is not what Nuxt Content v3 emits at all.
+   *
+   * Only colour and background are overridden. The font-style, weight and
+   * text-decoration properties resolve to the same values in both themes, and
+   * a `var()` with no fallback for a token that doesn't define them would make
+   * the whole declaration invalid at computed-value time.
+   */
+  @media (prefers-color-scheme: dark) {
+    html .shiki span {
+      color: var(--shiki-dark) !important;
+      background: var(--shiki-dark-bg) !important;
+    }
   }
 
   @media (prefers-reduced-motion: no-preference) {

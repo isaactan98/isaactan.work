@@ -6,6 +6,16 @@ import typography from '@tailwindcss/typography'
  * Colours are deliberately off-white / soft-grey rather than pure #fff / #000.
  */
 export default <Partial<Config>>{
+  /**
+   * `media`, not `class`: the appearance follows the system setting and there
+   * is no in-app toggle to drive a class with — see the note in
+   * app/assets/css/tailwind.css. This exists only as an escape hatch for the
+   * handful of places that need a literal colour a token can't carry (an
+   * arbitrary gradient stop, say); the palette itself adapts through custom
+   * properties, so `dark:` should stay rare.
+   */
+  darkMode: 'media',
+
   theme: {
     extend: {
       fontFamily: {
@@ -22,10 +32,29 @@ export default <Partial<Config>>{
         // Data, labels, metadata — and the landing-page headline.
         mono: ['IBM Plex Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace']
       },
+      /**
+       * Every token points at a custom property defined in
+       * app/assets/css/tailwind.css, which is where the light and dark values
+       * actually live. Tailwind resolves `theme()` at build time, so a literal
+       * hex here would bake one appearance into all ~190 `theme()` calls in
+       * this project's scoped styles; a `var()` is resolved by the browser
+       * instead, and every one of those call sites becomes appearance-aware
+       * for free.
+       *
+       * The consequence to know about: Tailwind's slash-opacity modifiers
+       * (`bg-canvas/50`) cannot work against a plain `var()` — they need the
+       * colour split into raw channels with an <alpha-value> placeholder.
+       * Nothing in this project uses them on these tokens (checked), and the
+       * simplicity is worth more than the capability. If one is ever needed,
+       * that token has to move to `rgb(var(--c-x) / <alpha-value>)` form and
+       * its custom property to bare channels.
+       */
       colors: {
         // Page surfaces
-        canvas: '#fbfbfa',
-        surface: '#ffffff',
+        canvas: 'var(--c-canvas)',
+        surface: 'var(--c-surface)',
+        // Row and card hover, one step off the surface.
+        hover: 'var(--c-hover)',
         // Text.
         //
         // A three-tier grey ladder on a near-white canvas is tighter than it
@@ -47,21 +76,21 @@ export default <Partial<Config>>{
         // separation as the range allows once both tiers must pass AA — so
         // tier three is expected to lean on size and weight as well as colour,
         // never on colour alone.
-        ink: '#37352f',
-        'ink-muted': '#5c5b57',
-        'ink-faint': '#747471',
+        ink: 'var(--c-ink)',
+        'ink-muted': 'var(--c-ink-muted)',
+        'ink-faint': 'var(--c-ink-faint)',
         // Lines
-        line: '#e9e9e7',
-        'line-strong': '#dfdfdd',
+        line: 'var(--c-line)',
+        'line-strong': 'var(--c-line-strong)',
         // The page's only chromatic accent, and it is semantic: it marks a row
         // that is still running (current role, open to work). Nothing else.
-        signal: '#4a8f5b',
+        signal: 'var(--c-signal)',
         // Callout tints (Notion block backgrounds)
         callout: {
-          default: '#f1f1ef',
-          info: '#e7f3f8',
-          warning: '#fbf3db',
-          success: '#edf3ec'
+          default: 'var(--c-callout)',
+          info: 'var(--c-callout-info)',
+          warning: 'var(--c-callout-warning)',
+          success: 'var(--c-callout-success)'
         }
       },
       maxWidth: {
@@ -136,10 +165,11 @@ export default <Partial<Config>>{
 
             // Notion's inline-code red, darkened: the original #eb5757
             // measured 3.14:1 against this background at 0.875em (14px), which
-            // needs 4.5:1. #be4646 measures 4.56:1 and keeps the hue.
+            // needs 4.5:1. #be4646 measures 4.56:1 and keeps the hue. The dark
+            // appearance lifts it back the other way (see --c-code-text).
             code: {
-              backgroundColor: '#f4f3f1',
-              color: '#be4646',
+              backgroundColor: 'var(--c-code-bg)',
+              color: 'var(--c-code-text)',
               fontWeight: '400',
               borderRadius: '3px',
               padding: '0.15em 0.35em',
