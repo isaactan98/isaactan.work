@@ -136,19 +136,19 @@ const isExternal = (href: string) => href.startsWith('http')
       <div class="contact-line flex flex-wrap items-baseline justify-between gap-x-8 gap-y-3 border-t border-line pt-4">
         <a
           href="mailto:hello@isaactan.work"
-          class="text-[1.0625rem] underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-ink"
+          class="tap-44 text-[1.0625rem] underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-ink"
         >
           hello@isaactan.work
         </a>
         <span class="flex gap-5 font-mono text-[0.75rem] uppercase tracking-[0.08em] text-ink-muted">
-          <a href="https://github.com/isaactan98" target="_blank" rel="noopener" class="nav-link">GitHub</a>
-          <a href="https://linkedin.com/in/isaactan98" target="_blank" rel="noopener" class="nav-link">LinkedIn</a>
+          <a href="https://github.com/isaactan98" target="_blank" rel="noopener" class="nav-link tap-44">GitHub</a>
+          <a href="https://linkedin.com/in/isaactan98" target="_blank" rel="noopener" class="nav-link tap-44">LinkedIn</a>
         </span>
       </div>
     </section>
 
     <p class="back">
-      <NuxtLink to="/">&larr; Hiring instead? The CV is on the front page.</NuxtLink>
+      <NuxtLink to="/" class="tap-44">&larr; Hiring instead? The CV is on the front page.</NuxtLink>
     </p>
   </main>
 </template>

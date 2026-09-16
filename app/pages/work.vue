@@ -522,12 +522,19 @@ const year = (d: string) => d.slice(0, 4)
   font-size: 0.6875rem;
   letter-spacing: 0.06em;
   color: theme('colors.ink-faint');
-  margin-bottom: 0.75rem;
+  /* Reclaims the vertical padding the buttons below take for a 44px hit area
+     so the row sits exactly where it did; the second value preserves the
+     0.75rem gap to the content beneath, measured from the text rather than
+     from the enlarged target. */
+  margin-block: -0.8125rem calc(0.75rem - 0.8125rem);
 }
 
 .sort button {
   cursor: pointer;
   transition: color 150ms ease;
+  /* 11px mono gives an 18px line box — below Apple's 28x28pt floor and below
+     WCAG 2.5.8's 24px. These pads take it to 44px without moving anything. */
+  padding-block: 0.8125rem;
 }
 
 .sort button:hover {
@@ -572,7 +579,9 @@ const year = (d: string) => d.slice(0, 4)
 }
 
 .chip-count {
-  font-size: 0.625rem;
+  /* 11px floor, not 10 — Apple's iOS minimum type size
+     (`accessibility.md › Vision`). */
+  font-size: 0.6875rem;
   color: theme('colors.ink-faint');
 }
 

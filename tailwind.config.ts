@@ -26,10 +26,30 @@ export default <Partial<Config>>{
         // Page surfaces
         canvas: '#fbfbfa',
         surface: '#ffffff',
-        // Text
+        // Text.
+        //
+        // A three-tier grey ladder on a near-white canvas is tighter than it
+        // looks: every tier that carries text has to clear WCAG AA's 4.5:1,
+        // and there is only so much room between #37352f and #fbfbfa to fit
+        // three distinguishable steps. The previous values did not clear it —
+        // ink-muted measured 4.32:1 (it carries the homepage lede at 17px) and
+        // ink-faint measured 2.72:1, which fails even the 3:1 large/bold
+        // threshold while carrying every section label on the site.
+        //
+        // Measured against canvas #fbfbfa:
+        //   ink        #37352f  11.84:1
+        //   ink-muted  #5c5b57   6.57:1   (was #787774, 4.32:1 — failed)
+        //   ink-faint  #747471   4.53:1   (was #9b9a97, 2.72:1 — failed)
+        // and on surface #ffffff: 12.26 / 6.80 / 4.62.
+        //
+        // Tier separation is 1.80:1 (ink to muted) and 1.45:1 (muted to
+        // faint). The second step is deliberately slight — it is as much
+        // separation as the range allows once both tiers must pass AA — so
+        // tier three is expected to lean on size and weight as well as colour,
+        // never on colour alone.
         ink: '#37352f',
-        'ink-muted': '#787774',
-        'ink-faint': '#9b9a97',
+        'ink-muted': '#5c5b57',
+        'ink-faint': '#747471',
         // Lines
         line: '#e9e9e7',
         'line-strong': '#dfdfdd',
@@ -114,9 +134,12 @@ export default <Partial<Config>>{
             'blockquote p:first-of-type::before': { content: 'none' },
             'blockquote p:last-of-type::after': { content: 'none' },
 
+            // Notion's inline-code red, darkened: the original #eb5757
+            // measured 3.14:1 against this background at 0.875em (14px), which
+            // needs 4.5:1. #be4646 measures 4.56:1 and keeps the hue.
             code: {
               backgroundColor: '#f4f3f1',
-              color: '#eb5757',
+              color: '#be4646',
               fontWeight: '400',
               borderRadius: '3px',
               padding: '0.15em 0.35em',
