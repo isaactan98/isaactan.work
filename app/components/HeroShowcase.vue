@@ -112,6 +112,24 @@ onMounted(async () => {
   }
 })
 
+/**
+ * The scene lost its GPU context — routine on iOS, where Safari discards
+ * contexts on backgrounding and under memory pressure. On a viewport whose
+ * CSS has hidden the art, `forceArt` is the only thing that can bring it
+ * back, so this is the same recovery as a failed chunk or a missing WebGL
+ * implementation, just arriving later.
+ */
+function onSceneContextLost() {
+  sceneVisible.value = false
+  forceArt.value = true
+}
+
+/** The scene rebuilt itself on a fresh context; hand the slot back to it. */
+function onSceneContextRestored() {
+  sceneVisible.value = true
+  forceArt.value = false
+}
+
 onUnmounted(() => {
   if (slowTimer) clearTimeout(slowTimer)
 })
@@ -128,7 +146,13 @@ onUnmounted(() => {
          the page, and it is what a reader with no JS keeps. -->
     <HeroLineArt class="hero-showcase-art" />
     <ClientOnly>
-      <component :is="sceneComponent" v-if="sceneComponent" class="hero-showcase-scene" />
+      <component
+        :is="sceneComponent"
+        v-if="sceneComponent"
+        class="hero-showcase-scene"
+        @contextlost="onSceneContextLost"
+        @contextrestored="onSceneContextRestored"
+      />
     </ClientOnly>
   </div>
 </template>
