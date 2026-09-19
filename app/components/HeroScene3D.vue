@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * The 3D half of the hero — see PRODUCT.md's 2026-09-11 entry for why this
- * exists and what it's scoped to. Only ever mounted by HeroShowcase once
- * motion is allowed, WebGL works, and the viewport has room; this component
- * doesn't re-check any of that, and has no non-animated fallback of its own
- * on purpose — HeroLineArt is that fallback, one level up.
+ * The 3D half of the hero — see PRODUCT.md's 2026-09-11 and 2026-09-19
+ * entries for why this exists and what it's scoped to. Only ever mounted by
+ * HeroShowcase once motion is allowed, WebGL works and the visitor hasn't
+ * asked to be spared the bytes; this component doesn't re-check any of that,
+ * and has no non-animated fallback of its own on purpose — HeroLineArt is
+ * that fallback, one level up. Width is not among those conditions: phones
+ * get this scene too, at 327-392px against a desktop's ~385px.
  *
  * Built as an orthographic "technical drawing brought into 3D": pale
  * canvas-coloured surfaces with ink edge lines, the same silhouette and
@@ -138,6 +140,45 @@ const SWAY_RAD = THREE.MathUtils.degToRad(18)
  * draw on.
  */
 const emit = defineEmits<{ contextlost: []; contextrestored: [] }>()
+
+const props = withDefaults(
+  defineProps<{
+    /**
+     * Whether to perform the entrance or arrive already at rest. The showcase
+     * turns it off where the canvas is dissolving out of the static line art,
+     * so the two images share a pose through the crossfade.
+     */
+    entrance?: boolean
+  }>(),
+  { entrance: true }
+)
+
+/**
+ * Whether to trade edge quality for fill rate.
+ *
+ * Both signals are crude and neither is universal — Safari exposes no
+ * `deviceMemory` at all — so this is deliberately biased toward saying no. A
+ * false positive costs visible quality on a capable phone, and costs it
+ * precisely where this scene can least afford it: its form comes from 1px ink
+ * edge lines, which are exactly what loses most to a lower resolution and no
+ * multisampling. A false negative costs a weak device some warmth on one
+ * screen. Given that asymmetry, only a positive signal steps down, and
+ * "unknown" is treated as capable.
+ *
+ * `hardwareConcurrency <= 2` rather than the more tempting `<= 4`: four cores
+ * covers a great many perfectly capable phones, and flagging them all would
+ * make the reduction the common path rather than the exception it is meant to
+ * be.
+ */
+function prefersLowerFidelity() {
+  const nav = navigator as Navigator & { deviceMemory?: number }
+  if (typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 4) return true
+  if (typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency <= 2) return true
+  return false
+}
+
+/** Read once in `onMounted`; device class cannot change mid-session. */
+let lowerFidelity = false
 
 const root = ref<HTMLDivElement | null>(null)
 
@@ -761,8 +802,13 @@ function build(animate: boolean) {
   camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 40)
   camera.position.set(4.6, 3.4, 6.2)
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  // The cap is on the *rendered* pixel count, not the device's: at DPR 3 a
+  // 385x279 slot would be a 1155x837 buffer for no visible gain over 2, since
+  // the ink edge lines are already resolved well past the point a phone
+  // screen can show. The step down to 1.5 with multisampling off is the
+  // low-end concession — see `prefersLowerFidelity` for why it is rare.
+  renderer = new THREE.WebGLRenderer({ antialias: !lowerFidelity, alpha: true })
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowerFidelity ? 1.5 : 2))
   root.value.appendChild(renderer.domElement)
   renderer.domElement.addEventListener('webglcontextlost', onContextLost)
   renderer.domElement.addEventListener('webglcontextrestored', onContextRestored)
@@ -983,7 +1029,8 @@ onMounted(() => {
   const mq = window.matchMedia('(prefers-color-scheme: dark)')
   appearance = mq
   palette = readPalette(mq.matches)
-  build(true)
+  lowerFidelity = prefersLowerFidelity()
+  build(props.entrance)
   mq.addEventListener('change', onAppearanceChange)
 
   // Observes the container rather than the canvas, so it survives every

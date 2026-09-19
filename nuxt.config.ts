@@ -73,10 +73,15 @@ export default defineNuxtConfig({
      * specific links — they come from Nuxt's own manifest-prefetch step,
      * not Vite's). HeroShowcase.vue's `import('./HeroScene3D.vue')` is
      * written as an imperative call inside a feature-detection check
-     * specifically so mobile, reduced-motion and no-WebGL visitors never
+     * specifically so reduced-motion, no-WebGL and saved-data visitors never
      * fetch the three.js+gsap bundle behind it — Nuxt's build-time manifest
      * step can't see that runtime condition, so without this hook every
      * visitor downloaded it regardless of whether the scene ever renders.
+     *
+     * Phones were on that list until 2026-09-19 and are not any more, which
+     * makes the hook matter more rather than less: prefetching would now hand
+     * the chunk to every visitor on every device up front, including the ones
+     * that have explicitly asked not to be given it.
      *
      * Matched by the manifest's source-path key (contains "HeroScene3D"),
      * not the hashed output filename, which changes every build. Scoped to

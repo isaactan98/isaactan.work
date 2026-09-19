@@ -2,15 +2,19 @@
 /**
  * The always-available version of the hero: a static line-art laptop and
  * mirrorless camera, in the site's own palette. This is what renders under
- * reduced motion, no WebGL, or a narrow viewport — see PRODUCT.md's
- * 2026-09-11 entry for why the hero gets a 3D/GSAP treatment at all, and why
- * that treatment is required to degrade to exactly this rather than to
- * nothing.
+ * reduced motion, with no WebGL, on a saved-data or 2G connection, and after
+ * a lost GPU context — see PRODUCT.md's 2026-09-11 and 2026-09-19 entries for
+ * why the hero gets a 3D/GSAP treatment at all, and why that treatment is
+ * required to degrade to exactly this rather than to nothing.
  *
- * Narrow viewports are the *main* audience for this file, not the edge case:
- * every phone gets this drawing and none of them get the 3D scene. So it is
- * drawn for ~343px, not shrunk down from a desktop illustration. Two things
- * follow from that, and both were real defects in the first version:
+ * It is also the first thing every narrow viewport paints, and what the 3D
+ * canvas dissolves out of there — so on a phone this drawing is always seen,
+ * whether or not the scene follows it. It no longer has the *exclusive* claim
+ * on phones it was first written for (they get the scene now too), but it is
+ * still sized for them rather than shrunk down from a desktop illustration,
+ * and that matters more than before: the crossfade puts it side by side with
+ * the 3D version at the same size, where any softness would be obvious. Two
+ * things follow, and both were real defects in the first version:
  *
  * 1. The viewBox is close to the delivered pixel size. The old one was
  *    600×420 rendering into ~343px, a 0.57 scale factor that quietly took

@@ -78,6 +78,35 @@ everywhere. Everything below the hero — Selected Work, Experience, Writing,
 Contact — stays exactly as restrained as principles 1-5 describe. The
 exception is scoped to one section, not a license to decorate the page.
 
+**2026-09-19 — the hero exception now includes phones.** The entry above
+lists "a narrow viewport" as one of the conditions the 3D treatment degrades
+under. That clause is superseded: every viewport that can run WebGL gets the
+scene, and the fallbacks are now reduced motion, no WebGL, an explicit
+saved-data or 2G connection, and a lost GPU context. This is the second
+explicit decision the entry above says would be required, taken with the
+tradeoff stated below rather than as a drift.
+
+What changed was a measurement, not a preference. The width gate was
+justified partly on the scene needing room a phone couldn't give it, and that
+turned out to be false: the showcase slot is ~385px wide on a >=900px
+viewport and 416px on a tablet, against 327-392px on a phone. Desktop was
+never getting the space the gate implied it was protecting, so the
+composition argument for excluding phones did not survive being checked. The
+gate's real cost was ~171KB gzipped and a render loop that never stopped, and
+both are now addressed on their own terms — the scene pauses when it is
+scrolled off screen, drops resolution and multisampling on genuinely weak
+hardware, and is skipped outright for anyone whose browser says they are
+saving data.
+
+What has *not* changed: the exception is still scoped to the hero, still
+required to degrade to HeroLineArt rather than to nothing, and still costs
+nothing for a reader who won't see it move. Phones pay 171KB for decoration
+now where they previously paid zero. That is a real cost and it was accepted
+knowingly, on the same basis as the original decision — visual impact over
+restraint, for one section. Reverting it means restoring the width condition
+in HeroShowcase.vue's `matchMedia` call and its paired media query, and would
+be a third explicit decision, not a default this document returns to.
+
 ## Design Principles
 
 1. **Evidence over assertion.** Every claim about a skill or a project is a

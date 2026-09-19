@@ -19,16 +19,37 @@ import type { Component } from 'vue'
  * before the canvas took over. Even on a fast link it is a visible flash of
  * the wrong picture.
  *
- * Two of the three conditions that gate the 3D scene — viewport width and
- * `prefers-reduced-motion` — are things CSS can evaluate at first paint. So
+ * `prefers-reduced-motion` is something CSS can evaluate at first paint. So
  * the stylesheet below hides the static art in exactly the case where the
  * scene is going to replace it, and that happens before anything is painted.
- * JS is left holding only the condition CSS genuinely cannot test (WebGL
- * support), and its job is now to *restore* the art in the exceptional cases,
- * not to introduce it in the normal one.
+ * JS is left holding the conditions CSS genuinely cannot test — WebGL support
+ * and the visitor's data preference — and its job is to *restore* the art in
+ * those exceptional cases, not to introduce it in the normal one.
  *
- * The media query in the stylesheet and the `matchMedia` calls here are the
- * same condition expressed twice and must be kept in sync by hand; there is
+ * ## Why width picks a strategy rather than gating the scene
+ *
+ * Width used to be a third gate: below 720px nobody got the scene at all. It
+ * is not one any more, and the argument that retired it is a measurement.
+ * The showcase slot is ~385px wide on a >=900px viewport (an 820px page
+ * column, less padding, times the 1.12/2.12 grid share) and 416px on a
+ * tablet. A phone gives it 327-392px. The scene was never getting the room
+ * the gate implied it was protecting, so "too small to read" was not the real
+ * cost — bytes and battery were, and those are addressed directly now:
+ * `prefersLessData` below, and the off-screen render pause in HeroScene3D.
+ *
+ * What width still decides is the *first-paint* strategy, because the
+ * trade-off above genuinely inverts with it:
+ *
+ * - **Wide.** The art is the wrong picture here, so it is hidden before
+ *   anything paints and the slot stays empty until the canvas arrives.
+ * - **Narrow.** The art is *not* the wrong picture — it is the same
+ *   composition — so it stays up and the canvas dissolves over it. The scene
+ *   is mounted at its rest pose (`:entrance="false"`) so both sides of that
+ *   dissolve show the same pose. Blanking the slot here would pay the
+ *   empty-slot cost for nothing, on the connections that can least afford it.
+ *
+ * The media query in the stylesheet and the `matchMedia` call here are the
+ * same threshold expressed twice and must be kept in sync by hand; there is
  * no way to share one source between a stylesheet and a script. They are
  * written adjacently and both flagged for that reason.
  *
@@ -46,8 +67,37 @@ import type { Component } from 'vue'
  * has no static template reference for that pass to find.
  */
 
-/** Kept in sync by hand with the media query in this file's stylesheet. */
-const SCENE_MIN_WIDTH = '(min-width: 720px)'
+/**
+ * The width at which the first-paint strategy flips — see above. Kept in sync
+ * by hand with the media query in this file's stylesheet. Not a gate on the
+ * scene: every width that can run WebGL gets it.
+ */
+const WIDE_VIEWPORT = '(min-width: 720px)'
+
+/**
+ * Explicit signals that this visitor does not want ~171KB gzipped of
+ * three.js spent on decoration.
+ *
+ * Deliberately only explicit ones. This switches the hero off outright, so a
+ * device-class guess has no business in it — unlike the fidelity step-down
+ * inside HeroScene3D, which only costs some sharpness and can afford to be
+ * wrong. `effectiveType` is a measurement of the link rather than a guess
+ * about the hardware, and on a 2G connection this chunk has stopped being a
+ * flourish; the static art is a complete substitute either way.
+ *
+ * Absent in Safari, which reports no `connection` at all — so this reads as
+ * "no objection" there, and the `SLOW_CONNECTION_MS` fallback below is what
+ * covers a slow link that never announced itself.
+ */
+function prefersLessData() {
+  const conn = (navigator as Navigator & {
+    connection?: { saveData?: boolean; effectiveType?: string }
+  }).connection
+  if (!conn) return false
+  return (
+    conn.saveData === true || conn.effectiveType === 'slow-2g' || conn.effectiveType === '2g'
+  )
+}
 
 /**
  * How long an empty hero slot is acceptable before the static art is shown
@@ -60,17 +110,31 @@ const SLOW_CONNECTION_MS = 2000
 
 const sceneComponent = shallowRef<Component | null>(null)
 const sceneVisible = ref(false)
-/** Puts the static art back on a viewport whose CSS has hidden it. */
+/**
+ * Puts the static art back on a viewport whose CSS has hidden it. A no-op
+ * class on a narrow viewport, where the art is visible anyway — which is what
+ * lets every failure path below stay one branch instead of two.
+ */
 const forceArt = ref(false)
+/**
+ * Whether the scene should perform its entrance. Only where the art was
+ * hidden at first paint: on a narrow viewport the canvas is dissolving out of
+ * the static drawing, and an entrance would dissolve it into a laptop
+ * mid-flight instead of into the same pose.
+ */
+const playEntrance = ref(true)
 
 let slowTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  const wideEnough = window.matchMedia(SCENE_MIN_WIDTH).matches
+  const artHiddenByCss = window.matchMedia(WIDE_VIEWPORT).matches
 
-  // CSS is already showing the art for these two, so there is nothing to do.
-  if (reducedMotion || !wideEnough) return
+  playEntrance.value = artHiddenByCss
+
+  // The one gate left at every width. CSS is already showing the art for it,
+  // so there is nothing to restore.
+  if (reducedMotion) return
 
   const hasWebGL = (() => {
     try {
@@ -81,16 +145,21 @@ onMounted(async () => {
     }
   })()
 
-  // The one condition CSS can't test. The slot is currently empty on this
-  // viewport, so failing to handle it would leave a permanent hole.
-  if (!hasWebGL) {
+  // The conditions CSS can't test. On a wide viewport the slot is currently
+  // empty, so failing to handle them would leave a permanent hole; on a
+  // narrow one `forceArt` does nothing and the art is simply never replaced.
+  if (!hasWebGL || prefersLessData()) {
     forceArt.value = true
     return
   }
 
-  slowTimer = setTimeout(() => {
-    forceArt.value = true
-  }, SLOW_CONNECTION_MS)
+  // Only meaningful where the slot is actually empty. On a narrow viewport
+  // the art is already up, so there is no gap for this to close.
+  if (artHiddenByCss) {
+    slowTimer = setTimeout(() => {
+      forceArt.value = true
+    }, SLOW_CONNECTION_MS)
+  }
 
   try {
     const mod = await import('./HeroScene3D.vue')
@@ -150,6 +219,7 @@ onUnmounted(() => {
         :is="sceneComponent"
         v-if="sceneComponent"
         class="hero-showcase-scene"
+        :entrance="playEntrance"
         @contextlost="onSceneContextLost"
         @contextrestored="onSceneContextRestored"
       />
@@ -170,17 +240,54 @@ onUnmounted(() => {
   transition: opacity 300ms ease;
 }
 
-/* The same condition as the `matchMedia` calls in this file's script — the
-   case where the 3D scene is going to replace this art. Evaluated at first
-   paint, which is the entire point: JS cannot hide something before it has
-   already been shown. Keep the two in sync by hand. */
+/* The narrow-viewport strategy, and the default: the art is painted, and
+   taken away only once the canvas is genuinely up. */
+.hero-showcase.scene-in .hero-showcase-art {
+  opacity: 0;
+}
+
+/* That swap is sequenced rather than cross-dissolved, and a screenshot is why.
+   HeroLineArt and HeroScene3D are deliberately the same composition, but they
+   were never *registered* to each other: the drawing frames itself inside a
+   480x348 viewBox, while the scene's framing is derived at runtime by `fitRig`
+   from the geometry's own bounding box plus a 4% pad. Close enough to read as
+   one design when you see them one at a time; not close enough to overlap. Held
+   at 50/50 you get a second laptop and a second camera visibly offset behind
+   the first, which reads as a rendering fault rather than as a transition.
+
+   So the art is given a shorter fade and the canvas waits for it to finish.
+   The cost is a brief dip in the middle, which reads as a deliberate swap.
+   Scoped to narrow viewports: on a wide one the art is already hidden, there
+   is nothing to sequence against, and the delay would only prolong an empty
+   slot.
+
+   `not all and (min-width: ...)` rather than a `max-width` with a fudged
+   fraction, so it is exactly the complement of the query below at any
+   subpixel viewport width. */
+@media not all and (min-width: 720px) {
+  .hero-showcase-art {
+    transition-duration: 150ms;
+  }
+
+  .hero-showcase-scene {
+    transition: opacity 260ms ease 140ms;
+  }
+}
+
+/* The wide-viewport strategy: hide the art before anything is painted,
+   because here it *is* the wrong picture and a 16.8s flash of it was the
+   original defect. The same threshold as the `matchMedia` call in this file's
+   script — keep the two in sync by hand. */
 @media (min-width: 720px) and (prefers-reduced-motion: no-preference) {
   .hero-showcase-art {
     opacity: 0;
   }
 
-  /* No WebGL, a failed chunk, or a connection slow enough that an empty slot
-     has stopped being acceptable. */
+  /* No WebGL, a saved-data or 2G connection, a failed chunk, a lost GPU
+     context, or a link slow enough that an empty slot has stopped being
+     acceptable. Equal specificity to the `.scene-in` rule above and
+     deliberately later, so a recovered failure wins over a stale `scene-in` —
+     though in practice the script never sets both at once. */
   .hero-showcase.force-art .hero-showcase-art {
     opacity: 1;
   }
