@@ -341,7 +341,18 @@ const writing = computed(() => [
   }
 }
 
+/* `width: 100%` is load-bearing, not redundant. Without it the auto inline
+   margins make this a shrink-to-fit grid item rather than a stretched one, and
+   what it shrinks to is the inline SVG's intrinsic width — which HeroLineArt
+   does not declare, so it falls back to the 300px CSS default for a replaced
+   element. The slot then sat at 300px on every viewport below 900px, never
+   reaching the 26rem it is capped at and never needing the centring those
+   margins were added for: on a 430px phone that left 82px of the column unused
+   and the hero visibly off-centre. Measured, not theorised — the same slot is
+   385px on desktop, where the 900px rule drops the auto margins and the
+   stretch works. */
 .hero-showcase-slot {
+  width: 100%;
   max-width: 26rem;
   margin-inline: auto;
 }

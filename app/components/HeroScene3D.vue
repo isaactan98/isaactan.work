@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * The 3D half of the hero — see PRODUCT.md's 2026-09-11 entry for why this
- * exists and what it's scoped to. Only ever mounted by HeroShowcase once
- * motion is allowed, WebGL works, and the viewport has room; this component
- * doesn't re-check any of that, and has no non-animated fallback of its own
- * on purpose — HeroLineArt is that fallback, one level up.
+ * The 3D half of the hero — see PRODUCT.md's 2026-09-11 and 2026-09-19
+ * entries for why this exists and what it's scoped to. Only ever mounted by
+ * HeroShowcase once motion is allowed, WebGL works and the visitor hasn't
+ * asked to be spared the bytes; this component doesn't re-check any of that,
+ * and has no non-animated fallback of its own on purpose — HeroLineArt is
+ * that fallback, one level up. Width is not among those conditions: phones
+ * get this scene too, at 327-392px against a desktop's ~385px.
  *
  * Built as an orthographic "technical drawing brought into 3D": pale
  * canvas-coloured surfaces with ink edge lines, the same silhouette and
@@ -131,17 +133,91 @@ const ROUND_EDGE_THRESHOLD = 25
  */
 const SWAY_RAD = THREE.MathUtils.degToRad(18)
 
+/**
+ * The two states this component cannot recover from on its own, reported so
+ * the showcase one level up can put the static art back. The showcase owns
+ * that fallback; this component only knows whether it still has a GPU to
+ * draw on.
+ */
+const emit = defineEmits<{ contextlost: []; contextrestored: [] }>()
+
+const props = withDefaults(
+  defineProps<{
+    /**
+     * Whether to perform the entrance or arrive already at rest. The showcase
+     * turns it off where the canvas is dissolving out of the static line art,
+     * so the two images share a pose through the crossfade.
+     */
+    entrance?: boolean
+  }>(),
+  { entrance: true }
+)
+
+/**
+ * Whether to trade edge quality for fill rate.
+ *
+ * Both signals are crude and neither is universal — Safari exposes no
+ * `deviceMemory` at all — so this is deliberately biased toward saying no. A
+ * false positive costs visible quality on a capable phone, and costs it
+ * precisely where this scene can least afford it: its form comes from 1px ink
+ * edge lines, which are exactly what loses most to a lower resolution and no
+ * multisampling. A false negative costs a weak device some warmth on one
+ * screen. Given that asymmetry, only a positive signal steps down, and
+ * "unknown" is treated as capable.
+ *
+ * `hardwareConcurrency <= 2` rather than the more tempting `<= 4`: four cores
+ * covers a great many perfectly capable phones, and flagging them all would
+ * make the reduction the common path rather than the exception it is meant to
+ * be.
+ */
+function prefersLowerFidelity() {
+  const nav = navigator as Navigator & { deviceMemory?: number }
+  if (typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 4) return true
+  if (typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency <= 2) return true
+  return false
+}
+
+/** Read once in `onMounted`; device class cannot change mid-session. */
+let lowerFidelity = false
+
 const root = ref<HTMLDivElement | null>(null)
 
 let renderer: THREE.WebGLRenderer | null = null
 let scene: THREE.Scene | null = null
 let camera: THREE.OrthographicCamera | null = null
 let resizeObserver: ResizeObserver | null = null
+let intersectionObserver: IntersectionObserver | null = null
 let tickerFn: (() => void) | null = null
 let idleTween: gsap.core.Tween | null = null
 let entranceTl: gsap.core.Timeline | null = null
 let shadowTexture: THREE.CanvasTexture | null = null
 const disposableTextures: THREE.Texture[] = []
+
+/**
+ * Whether the hero is currently near the viewport.
+ *
+ * Starts `true` so the opening frames always draw: IntersectionObserver's
+ * first callback is asynchronous, and defaulting to "not visible" would leave
+ * the slot blank for however long it takes to arrive. Every gate around
+ * rendering fails toward drawing for that reason — the same argument
+ * app/assets/css/tailwind.css makes for why the section reveals are CSS
+ * animations rather than observer callbacks.
+ */
+let inView = true
+
+/**
+ * Set between `webglcontextlost` and `webglcontextrestored`. Guards the
+ * rebuild, so a restore delivered twice cannot build a second scene on top of
+ * the first.
+ */
+let contextLost = false
+
+/**
+ * How far outside the viewport the scene keeps drawing. Enough that scrolling
+ * back up finds it already running, rather than watching it resume on the
+ * frame it reappears.
+ */
+const RENDER_MARGIN = '200px'
 
 /** Half-extents of the rest pose in camera-screen space, filled once by `fitRig`. */
 let fitHalfWidth = 1
@@ -628,6 +704,87 @@ function resize() {
 }
 
 /**
+ * A lost GPU context. Routine on iOS — Safari discards contexts under memory
+ * pressure and when the app is backgrounded — and close to unheard of on the
+ * desktop this scene was built against. That is precisely why it went
+ * unhandled: the platform that needs the recovery is the one that was never
+ * allowed to run the scene.
+ *
+ * Unhandled, the canvas freezes or clears while `forceArt` is already false
+ * and the showcase has faded the static art out, so the hero becomes a
+ * permanent empty box with nothing to bring it back.
+ *
+ * `preventDefault` is not optional here. It is what tells the browser this
+ * page intends to recover; without it `webglcontextrestored` is never
+ * dispatched at all.
+ */
+function onContextLost(event: Event) {
+  event.preventDefault()
+  contextLost = true
+  // Stop drawing and stop the clock, but leave the canvas in the document:
+  // the restore event is dispatched on that element, so removing it now would
+  // throw away the only route back.
+  stopRendering()
+  entranceTl?.pause()
+  idleTween?.pause()
+  emit('contextlost')
+}
+
+/**
+ * Rebuilt from scratch rather than resumed. Every material, both canvas
+ * textures and all of the geometry lived on the context that just died, and a
+ * partial re-upload would need a registry of all of them — the same argument
+ * `onAppearanceChange` makes for rebuilding instead of patching in place.
+ *
+ * `animate: false` for that same reason too: a laptop that re-performs its
+ * entrance because the OS reclaimed some memory is a glitch, not a delight.
+ *
+ * If the restore never arrives — which is allowed, since the browser only
+ * promises to try — the static art simply stays up, which is the correct
+ * degradation rather than a failure.
+ */
+function onContextRestored() {
+  if (!contextLost) return
+  contextLost = false
+  teardown()
+  build(false)
+  emit('contextrestored')
+}
+
+/**
+ * Renders on GSAP's ticker rather than a private rAF loop, so each draw lands
+ * after the tweens that moved the scene have been applied for that same
+ * frame.
+ *
+ * Idempotent: the intersection callback can fire repeatedly with the same
+ * state, and two copies of this on the ticker would draw the scene twice per
+ * frame for nothing.
+ */
+function startRendering() {
+  if (tickerFn) return
+  tickerFn = () => {
+    if (renderer && scene && camera) renderer.render(scene, camera)
+  }
+  gsap.ticker.add(tickerFn)
+}
+
+/**
+ * Stops drawing without touching the scene, which leaves the last composited
+ * frame on screen — so this is only safe for a canvas nobody is looking at.
+ * `preserveDrawingBuffer` is off, but that governs reading the buffer back,
+ * not what stays composited, so pausing does not blank the canvas.
+ *
+ * A backgrounded tab is already covered for free: GSAP's ticker runs on
+ * requestAnimationFrame, which the browser stops delivering there. This
+ * handles the case rAF does not — the hero scrolled off a page the visitor is
+ * still actively reading, which on a phone is most of the session.
+ */
+function stopRendering() {
+  if (tickerFn) gsap.ticker.remove(tickerFn)
+  tickerFn = null
+}
+
+/**
  * Builds the whole scene. Split out of `onMounted` so a change of appearance
  * can tear down and rebuild rather than trying to patch colours in place:
  * every material, both canvas textures and the hemisphere light's ground
@@ -645,9 +802,16 @@ function build(animate: boolean) {
   camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 40)
   camera.position.set(4.6, 3.4, 6.2)
 
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  // The cap is on the *rendered* pixel count, not the device's: at DPR 3 a
+  // 385x279 slot would be a 1155x837 buffer for no visible gain over 2, since
+  // the ink edge lines are already resolved well past the point a phone
+  // screen can show. The step down to 1.5 with multisampling off is the
+  // low-end concession — see `prefersLowerFidelity` for why it is rare.
+  renderer = new THREE.WebGLRenderer({ antialias: !lowerFidelity, alpha: true })
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, lowerFidelity ? 1.5 : 2))
   root.value.appendChild(renderer.domElement)
+  renderer.domElement.addEventListener('webglcontextlost', onContextLost)
+  renderer.domElement.addEventListener('webglcontextrestored', onContextRestored)
 
   // Three lights, no shadow maps: a hemisphere for ambient fill, a key from
   // the viewer's side to separate top faces from front faces, and a weak
@@ -792,6 +956,11 @@ function build(animate: boolean) {
         yoyo: true,
         ease: 'sine.inOut'
       })
+      // The entrance can finish after the hero has already been scrolled
+      // past, and this tween is the one that never ends on its own — so it
+      // has to start paused in that case or it runs unwatched for the rest of
+      // the session.
+      if (!inView) idleTween.pause()
     })
 
   // A rebuild wants the scene the entrance *arrives* at, not the pose it
@@ -800,17 +969,19 @@ function build(animate: boolean) {
   // one that animated — it just didn't perform.
   if (!animate) entranceTl.progress(1)
 
-  tickerFn = () => {
-    if (renderer && scene && camera) renderer.render(scene, camera)
-  }
-  gsap.ticker.add(tickerFn)
+  if (inView) startRendering()
 }
 
 function teardown() {
-  if (tickerFn) gsap.ticker.remove(tickerFn)
+  stopRendering()
   entranceTl?.kill()
   idleTween?.kill()
   resizeObserver?.disconnect()
+
+  if (renderer) {
+    renderer.domElement.removeEventListener('webglcontextlost', onContextLost)
+    renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored)
+  }
 
   scene?.traverse((obj) => {
     if (
@@ -858,12 +1029,40 @@ onMounted(() => {
   const mq = window.matchMedia('(prefers-color-scheme: dark)')
   appearance = mq
   palette = readPalette(mq.matches)
-  build(true)
+  lowerFidelity = prefersLowerFidelity()
+  build(props.entrance)
   mq.addEventListener('change', onAppearanceChange)
+
+  // Observes the container rather than the canvas, so it survives every
+  // rebuild — an appearance change and a context restore both replace the
+  // canvas underneath it.
+  intersectionObserver = new IntersectionObserver(
+    (entries) => {
+      const entry = entries[entries.length - 1]
+      if (!entry) return
+      inView = entry.isIntersecting
+      // Nothing is resumed while the context is gone; `onContextRestored`
+      // owns getting back to a drawing state.
+      if (contextLost) return
+      if (inView) {
+        startRendering()
+        entranceTl?.resume()
+        idleTween?.resume()
+      } else {
+        stopRendering()
+        entranceTl?.pause()
+        idleTween?.pause()
+      }
+    },
+    { rootMargin: RENDER_MARGIN }
+  )
+  if (root.value) intersectionObserver.observe(root.value)
 })
 
 onUnmounted(() => {
   appearance?.removeEventListener('change', onAppearanceChange)
+  intersectionObserver?.disconnect()
+  intersectionObserver = null
   teardown()
 })
 </script>
